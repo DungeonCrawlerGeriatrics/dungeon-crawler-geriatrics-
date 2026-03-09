@@ -740,7 +740,24 @@
     </aside>
   </div>
 
-  <script type="module">
+  <!-- MOBILE BOTTOM NAV — hidden on desktop via CSS -->
+  <nav class="mobile-nav" id="mobile-nav" style="display:none">
+    <button class="mobile-nav-btn active" id="mnav-party" onclick="mobileTab('party')">
+      <span class="nav-icon">⚔️</span>
+      PARTY
+      <span class="mobile-nav-unread" id="mnav-unread-party"></span>
+    </button>
+    <button class="mobile-nav-btn" id="mnav-group" onclick="mobileTab('group')">
+      <span class="nav-icon">📡</span>
+      GROUP
+      <span class="mobile-nav-unread" id="mnav-unread-group"></span>
+    </button>
+    <button class="mobile-nav-btn" id="mnav-private" onclick="mobileTab('private')">
+      <span class="nav-icon">🔮</span>
+      PRIVATE
+      <span class="mobile-nav-unread" id="mnav-unread-private"></span>
+    </button>
+  </nav>
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, set, get, onValue, update, push, remove }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -941,6 +958,7 @@
         renderedGroupKeys.add(key);
         document.querySelector(".log-empty")?.remove();
         appendGroupEntry(entry);
+        mobileMarkUnread('group'); // ping group tab if user is on another mobile tab
       });
     }
 
@@ -1023,7 +1041,7 @@
         renderedPrivateKeys.add(key);
         const div = document.createElement("div");
         div.className = `private-entry ${entry.from==="dm"?"from-dm":"from-me"}`;
-        if (entry.from === "dm" && activePmTab !== "dm") playDing();
+        if (entry.from === "dm" && activePmTab !== "dm") { playDing(); mobileMarkUnread('private'); }
         div.innerHTML = `
           <div class="pe-who">${entry.from==="dm"?"🔮 DM (PRIVATE)":"🔒 YOU (PRIVATE)"}</div>
           <div class="pe-body">${entry.from==="dm"?formatDM(entry.text):entry.text}</div>`;
@@ -2379,6 +2397,82 @@ Keep response under 80 words. Short. Conspiratorial.`;
         window.location.href="index.html";
       }
     };
+
+    // ── Mobile tab navigation ─────────────────────────────────
+    let currentMobileTab = 'group'; // default to group log on mobile
+
+    function isMobile() { return window.innerWidth <= 768; }
+
+    function initMobileNav() {
+      if (!isMobile()) return;
+      document.getElementById('mobile-nav').style.display = 'flex';
+      mobileTab('group'); // start on group log
+    }
+
+    window.mobileTab = function(tab) {
+      if (!isMobile()) return;
+      currentMobileTab = tab;
+
+      // Update all panels
+      document.getElementById('panel-left').classList.toggle('mobile-active',  tab === 'party');
+      document.querySelector('.panel-center').classList.toggle('mobile-active', tab === 'group');
+      document.getElementById('panel-right')?.classList.toggle('mobile-active', tab === 'private');
+
+      // Show/hide private input zone
+      const privInput = document.querySelector('.private-input-zone');
+      if (privInput) privInput.style.display = tab === 'private' ? 'block' : 'none';
+
+      // Show/hide group input zone
+      const inputZone = document.querySelector('.input-zone');
+      if (inputZone) inputZone.style.display = tab === 'group' ? 'block' : 'none';
+
+      // Update nav button states
+      document.querySelectorAll('.mobile-nav-btn').forEach(b => {
+        b.classList.remove('active', 'active-priv');
+      });
+      const btn = document.getElementById(`mnav-${tab === 'party' ? 'party' : tab === 'group' ? 'group' : 'private'}`);
+      if (btn) btn.classList.add(tab === 'private' ? 'active-priv' : 'active');
+
+      // Clear unread dot for this tab
+      const dot = document.getElementById(`mnav-unread-${tab === 'party' ? 'party' : tab === 'group' ? 'group' : 'private'}`);
+      if (dot) dot.classList.remove('visible');
+
+      // Scroll log to bottom when switching to group
+      if (tab === 'group') {
+        setTimeout(() => {
+          const log = document.getElementById('group-log');
+          if (log) log.scrollTop = log.scrollHeight;
+        }, 50);
+      }
+    };
+
+    // Mark unread on mobile nav when new messages arrive on inactive tab
+    function mobileMarkUnread(tab) {
+      if (!isMobile()) return;
+      if (currentMobileTab === tab) return; // already viewing this tab
+      const navTab = tab === 'dm' || tab === 'private' ? 'private' : tab;
+      const dot = document.getElementById(`mnav-unread-${navTab}`);
+      if (dot) dot.classList.add('visible');
+    }
+
+    // Init on load + handle resize
+    window.addEventListener('load', initMobileNav);
+    window.addEventListener('resize', () => {
+      if (isMobile()) {
+        document.getElementById('mobile-nav').style.display = 'flex';
+        mobileTab(currentMobileTab);
+      } else {
+        document.getElementById('mobile-nav').style.display = 'none';
+        // Restore desktop — show all panels
+        document.getElementById('panel-left').classList.remove('mobile-active');
+        document.querySelector('.panel-center').classList.remove('mobile-active');
+        document.getElementById('panel-right')?.classList.remove('mobile-active');
+        const inputZone = document.querySelector('.input-zone');
+        if (inputZone) inputZone.style.display = '';
+        const privInput = document.querySelector('.private-input-zone');
+        if (privInput) privInput.style.display = '';
+      }
+    });
 
     function showToast(msg,isError){
       let t=document.getElementById("__toast");
