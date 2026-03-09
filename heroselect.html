@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Choose Your Hero — Dungeon of Eternal Shadows</title>
+<title>Choose Your Hero — Dungeon Crawler Geriatrics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/global.css">
@@ -17,11 +17,10 @@
   <div class="torch torch-bl">🔥</div>
   <div class="torch torch-br">🔥</div>
 
-  <!-- ROOM INFO BAR -->
   <header class="room-bar">
     <div class="room-bar-left">
       <span class="room-bar-label">CAMPAIGN</span>
-      <span class="room-bar-value" id="campaign-title">The Shadow Lich's Keep</span>
+      <span class="room-bar-value" id="campaign-title">Loading...</span>
     </div>
     <div class="room-bar-center">
       <span class="room-bar-label">ROOM CODE</span>
@@ -37,35 +36,170 @@
   <main class="heroselect-main">
     <div class="hs-header">
       <h1 class="hs-title">Choose Your Hero</h1>
-      <p class="hs-subtitle">Each player selects one class. Taken classes are shown in grey.</p>
+      <p class="hs-subtitle">Pick your character. Yes, there's a healer. No, nobody ever picks the healer.</p>
     </div>
-
-    <!-- HERO GRID -->
-    <div class="hero-grid" id="hero-grid">
-      <!-- Populated by JS -->
-    </div>
-
-    <!-- PARTY ROSTER -->
+    <div class="hero-grid" id="hero-grid"></div>
     <div class="roster-panel">
       <div class="roster-title">⚔ Party Roster</div>
-      <div class="roster-list" id="roster-list">
-        <!-- Populated by JS -->
-      </div>
+      <div class="roster-list" id="roster-list"></div>
     </div>
-
-    <!-- WAITING / READY -->
-    <div class="ready-zone" id="ready-zone">
+    <div class="ready-zone">
       <div class="waiting-msg" id="waiting-msg">
         <div class="waiting-spinner">🔮</div>
         <span>Waiting for all players to choose their heroes...</span>
       </div>
       <button class="btn btn-gold btn-xl" id="btn-begin" style="display:none" onclick="beginAdventure()">
-        ⚔ Begin the Adventure
+        ⚔ Begin the Adventure (God Help Us)
       </button>
     </div>
   </main>
 
-  <script src="js/firebase-config.js"></script>
-  <script src="js/heroselect.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
+      authDomain:        "dungeon-crawler-geriatrics.firebaseapp.com",
+      databaseURL:       "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
+      projectId:         "dungeon-crawler-geriatrics",
+      storageBucket:     "dungeon-crawler-geriatrics.firebasestorage.app",
+      messagingSenderId: "967017118838",
+      appId:             "1:967017118838:web:fd4497925ca83bfb34b357"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    const CLASSES = [
+      { id:"warrior", name:"Ironclad Warrior", emoji:"⚔️", desc:"Frontline tank. Has done CrossFit for 6 months and won't shut up about it.", hp:120, maxHp:120, mp:30, maxMp:30, stats:["STR 18","CON 16","DEX 10"], abilities:["⚔ Power Strike","🛡 Shield Wall","📣 Battle Cry"], role:"Tank / Melee DPS" },
+      { id:"mage",    name:"Arcane Mage",      emoji:"🔮", desc:"Glass cannon. Definitely read the rulebook. Definitely brought a spreadsheet.", hp:65,  maxHp:65,  mp:120, maxMp:120, stats:["INT 20","WIS 14","CON 8"],  abilities:["🔥 Fireball","❄ Ice Lance","🛡 Arcane Shield"], role:"AoE Caster" },
+      { id:"rogue",   name:"Shadow Rogue",     emoji:"🗡️", desc:"Sneaky assassin. Insists they 'play D&D all the time' but last played in 1997.", hp:85,  maxHp:85,  mp:50,  maxMp:50,  stats:["DEX 20","CHA 14","STR 12"], abilities:["🗡 Backstab","👻 Vanish","☠ Poison Blade"], role:"Burst DPS / Stealth" },
+      { id:"paladin", name:"Holy Paladin",     emoji:"🛡️", desc:"Divine healer. Suspiciously enthusiastic about helping. Brought essential oils.", hp:100, maxHp:100, mp:80,  maxMp:80,  stats:["STR 15","CHA 18","WIS 16"], abilities:["⚡ Holy Smite","✨ Lay on Hands","🔆 Divine Shield"], role:"Support / Healer" },
+    ];
+
+    const params   = new URLSearchParams(window.location.search);
+    const roomCode = params.get("room");
+    const me       = JSON.parse(sessionStorage.getItem("dungeon_player") || "null");
+    if (!roomCode || !me) { window.location.href = "index.html"; }
+
+    let roomData = null;
+    let myClass  = null;
+
+    document.getElementById("display-room-code").textContent = roomCode;
+    window.copyRoomCode = () => { navigator.clipboard?.writeText(roomCode); showToast("Code copied!", false); };
+
+    // Build grid
+    const grid = document.getElementById("hero-grid");
+    grid.innerHTML = CLASSES.map(cls => `
+      <div class="hero-card ${cls.id}-card" id="hcard-${cls.id}" onclick="pickHero('${cls.id}')">
+        <div class="card-class-badge">${cls.role}</div>
+        <div class="hero-avatar-lg">${cls.emoji}</div>
+        <div class="hero-card-name">${cls.name}</div>
+        <div class="hero-card-desc">${cls.desc}</div>
+        <div class="hero-stats">${cls.stats.map(s=>`<div class="hero-stat-pill">${s}</div>`).join("")}</div>
+        <div class="bar-label-sm"><span>HP</span><span>${cls.hp}</span></div>
+        <div class="bar-track" style="margin-bottom:.4rem"><div class="bar-fill hp-high" style="width:${(cls.hp/120)*100}%"></div></div>
+        <div class="bar-label-sm"><span>MP</span><span>${cls.mp}</span></div>
+        <div class="bar-track" style="margin-bottom:.75rem"><div class="bar-fill mp" style="width:${(cls.mp/120)*100}%"></div></div>
+        <div class="hero-abilities">${cls.abilities.map(a=>`<div class="hero-ability">${a}</div>`).join("")}</div>
+        <div class="hero-card-footer" id="hcard-footer-${cls.id}">Click to choose</div>
+      </div>
+    `).join("");
+
+    window.pickHero = async function (classId) {
+      if (!roomData) return;
+      const taken = Object.values(roomData.players||{}).find(p => p.heroClass === classId && p.id !== me.id);
+      if (taken) { showToast(`${taken.name} already picked this!`, true); return; }
+      if (myClass) {
+        document.getElementById(`hcard-${myClass}`)?.classList.remove("selected","my-pick");
+        document.getElementById(`hcard-footer-${myClass}`).textContent = "Click to choose";
+      }
+      myClass = classId;
+      const cls = CLASSES.find(c => c.id === classId);
+      await update(ref(db, `rooms/${roomCode}/players/${me.id}`), {
+        heroClass: classId, heroEmoji: cls.emoji, heroName: cls.name,
+        hp: cls.hp, maxHp: cls.maxHp, mp: cls.mp, maxMp: cls.maxMp,
+        stats: cls.stats, abilities: cls.abilities, statuses: []
+      });
+    };
+
+    window.beginAdventure = async function () {
+      await update(ref(db, `rooms/${roomCode}`), { status: "playing" });
+      window.location.href = `game.html?room=${roomCode}`;
+    };
+
+    // Firebase listener
+    onValue(ref(db, `rooms/${roomCode}`), snap => {
+      if (!snap.exists()) { window.location.href = "index.html"; return; }
+      roomData = snap.val();
+      document.getElementById("campaign-title").textContent = roomData.campaign || roomCode;
+
+      const players = Object.values(roomData.players||{}).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
+
+      // Player pips
+      document.getElementById("player-pips").innerHTML = Array.from({length:4},(_,i)=>{
+        const p = players[i];
+        return `<div class="player-pip ${p?"filled":""}${p?.id===me.id?" me":""}" title="${p?p.name:"Waiting..."}">${p?p.name.slice(0,2).toUpperCase():"?"}</div>`;
+      }).join("");
+
+      // Roster
+      document.getElementById("roster-list").innerHTML = Array.from({length:4},(_,i)=>{
+        const p = players[i];
+        const cls = CLASSES.find(c=>c.id===p?.heroClass);
+        return `<div class="roster-slot ${p?"filled":""}">
+          <div class="roster-slot-avatar">${cls?cls.emoji:"👤"}</div>
+          <div class="roster-slot-name">${p?p.name:"Waiting..."}</div>
+          <div class="roster-slot-class">${cls?cls.name:"No hero chosen"}</div>
+        </div>`;
+      }).join("");
+
+      // Update card states
+      const takenMap = {};
+      players.forEach(p => { if (p.heroClass) takenMap[p.heroClass] = p.name; });
+      CLASSES.forEach(cls => {
+        const card   = document.getElementById(`hcard-${cls.id}`);
+        const footer = document.getElementById(`hcard-footer-${cls.id}`);
+        if (!card) return;
+        const isMine  = players.find(p=>p.id===me.id&&p.heroClass===cls.id);
+        const isTaken = takenMap[cls.id] && !isMine;
+        card.classList.toggle("selected", !!isMine);
+        card.classList.toggle("my-pick",  !!isMine);
+        card.classList.toggle("taken",    !!isTaken);
+        footer.textContent = isMine ? "✓ Your hero" : isTaken ? `Taken by ${takenMap[cls.id]}` : "Click to choose";
+      });
+
+      // Ready check
+      const allReady = players.length === 4 && players.every(p=>!!p.heroClass);
+      const chosen   = players.filter(p=>!!p.heroClass).length;
+      const waitEl   = document.getElementById("waiting-msg");
+      const beginEl  = document.getElementById("btn-begin");
+      if (allReady && me.isHost) { waitEl.style.display="none"; beginEl.style.display="inline-flex"; }
+      else if (allReady) { waitEl.querySelector("span").textContent = "All heroes chosen! Waiting for host to start..."; }
+      else { waitEl.querySelector("span").textContent = `${chosen}/4 heroes chosen — waiting for the others to stop arguing...`; }
+
+      // Non-host follow host to game
+      if (roomData.status === "playing" && !me.isHost) {
+        window.location.href = `game.html?room=${roomCode}`;
+      }
+    });
+
+    function showToast(msg, isError) {
+      let t = document.getElementById("__toast");
+      if (!t) { t = document.createElement("div"); t.id="__toast"; t.className="toast"; document.body.appendChild(t); }
+      t.textContent = msg; t.className = "toast"+(isError?" error":"");
+      requestAnimationFrame(()=>t.classList.add("show"));
+      setTimeout(()=>t.classList.remove("show"), 2500);
+    }
+
+    // Particles
+    const canvas = document.getElementById("particle-canvas");
+    const ctx = canvas.getContext("2d");
+    let W, H;
+    const pts = Array.from({length:40},()=>({x:Math.random()*1920,y:Math.random()*1080,r:Math.random()*1.5+0.3,dx:(Math.random()-.5)*.25,dy:-Math.random()*.5-.1,a:Math.random()}));
+    function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+    resize(); window.addEventListener("resize",resize);
+    (function frame(){ctx.clearRect(0,0,W,H);pts.forEach(p=>{p.x+=p.dx;p.y+=p.dy;p.a+=.005;if(p.y<-4){p.y=H+4;p.x=Math.random()*W;}ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(201,168,76,${(Math.sin(p.a)*.5+.5)*.5})`;ctx.fill();});requestAnimationFrame(frame);})();
+  </script>
 </body>
 </html>

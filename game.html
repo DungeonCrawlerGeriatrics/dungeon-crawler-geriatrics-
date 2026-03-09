@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dungeon of Eternal Shadows — In Progress</title>
+<title>Dungeon Crawler Geriatrics — In Progress</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/global.css">
@@ -11,7 +11,6 @@
 </head>
 <body class="game-page">
 
-  <!-- HEADER BAR -->
   <header class="game-header">
     <div class="gh-left">
       <span class="gh-logo">⚔️</span>
@@ -33,13 +32,9 @@
 
   <div class="game-layout">
 
-    <!-- ===== LEFT: PARTY PANEL ===== -->
     <aside class="panel panel-left">
       <div class="panel-hd">⚔ Your Party</div>
-      <div id="party-panel">
-        <!-- Hero cards injected by JS -->
-      </div>
-
+      <div id="party-panel"></div>
       <div class="panel-hd" style="margin-top:1rem;">🎒 Inventory</div>
       <div class="inventory-list" id="inventory-list">
         <div class="inv-item"><span>🧪</span> Healing Potion <em>×4</em></div>
@@ -49,74 +44,45 @@
       </div>
     </aside>
 
-    <!-- ===== CENTER: DUNGEON LOG + INPUT ===== -->
     <main class="panel panel-center">
-
-      <!-- LOG -->
       <div class="dungeon-log" id="dungeon-log">
         <div class="log-welcome">
           <div class="log-welcome-icon">🏰</div>
-          <div class="log-welcome-text">Your adventure is about to begin...</div>
+          <div class="log-welcome-text">Summoning the Dungeon Master...</div>
         </div>
       </div>
-
-      <!-- TYPING INDICATOR -->
       <div class="dm-typing" id="dm-typing">
         <span class="dm-typing-label">🎲 The Dungeon Master stirs...</span>
         <div class="typing-dots"><span></span><span></span><span></span></div>
       </div>
-
-      <!-- INPUT ZONE -->
       <div class="input-zone">
-
-        <!-- WHOSE TURN -->
-        <div class="turn-bar" id="turn-bar">
+        <div class="turn-bar">
           <span class="turn-label">ACTING:</span>
           <div class="turn-heroes" id="turn-heroes"></div>
         </div>
-
-        <!-- MY TURN PANEL (shown when it's your turn) -->
         <div class="my-turn-panel" id="my-turn-panel">
-          <div class="quick-actions" id="quick-actions">
+          <div class="quick-actions">
             <button class="qa-btn" onclick="quickAction('I search the area carefully for traps, secrets, or anything useful.')">🔍 Search</button>
             <button class="qa-btn" onclick="quickAction('I use a healing potion to restore my wounds.')">🧪 Heal</button>
-            <button class="qa-btn" onclick="quickAction('I attempt to rest briefly and catch my breath.')">💤 Rest</button>
+            <button class="qa-btn" onclick="quickAction('I attempt to rest briefly and catch my breath. My knees are killing me.')">💤 Rest</button>
             <button class="qa-btn" onclick="quickAction('I look around and describe what I observe to my party.')">👁️ Look</button>
+            <button class="qa-btn" onclick="quickAction('I complain loudly about being here and ask if we can go home yet.')">😤 Complain</button>
           </div>
           <div class="input-row">
-            <textarea
-              class="action-textarea"
-              id="action-input"
-              placeholder="What do you do?"
-              onkeydown="handleKey(event)"
-              rows="2"
-            ></textarea>
-            <button class="btn btn-ember btn-send" id="btn-send" onclick="sendAction()">
-              ⚡<br><span>Act</span>
-            </button>
+            <textarea class="action-textarea" id="action-input" placeholder="What do you do? (Besides regret coming here)" onkeydown="handleKey(event)" rows="2"></textarea>
+            <button class="btn btn-ember btn-send" id="btn-send" onclick="sendAction()">⚡<br><span>Act</span></button>
           </div>
         </div>
-
-        <!-- WAITING FOR OTHERS (shown when it's not your turn) -->
         <div class="waiting-panel" id="waiting-panel" style="display:none;">
           <div class="waiting-hero-icon" id="waiting-hero-icon">⚔️</div>
           <div class="waiting-hero-text" id="waiting-hero-text">Waiting for another hero to act...</div>
         </div>
-
       </div>
     </main>
 
-    <!-- ===== RIGHT: WORLD PANEL ===== -->
     <aside class="panel panel-right">
-
-      <div class="panel-hd">⚡ Quick Info</div>
-      <div class="info-card" id="encounter-card" style="display:none">
-        <div class="info-card-title" style="color:#ff7070;">⚔ Active Encounter</div>
-        <div id="encounter-content"></div>
-      </div>
-
+      <div class="panel-hd">⚡ Dungeon Depth</div>
       <div class="info-card">
-        <div class="info-card-title">🏰 Dungeon Depth</div>
         <div class="depth-track" id="depth-track">
           <div class="depth-pip active">1</div>
           <div class="depth-pip">2</div>
@@ -125,32 +91,319 @@
           <div class="depth-pip skull">💀</div>
         </div>
       </div>
-
       <div class="panel-hd">📜 Turn Order</div>
       <div class="turn-order" id="turn-order"></div>
-
       <div class="panel-hd">⚙ Session</div>
       <div class="session-info">
         <div class="sess-row"><span>Room</span><strong id="sess-room">????</strong></div>
         <div class="sess-row"><span>Turn</span><strong id="sess-turn">1</strong></div>
         <div class="sess-row"><span>Round</span><strong id="sess-round">1</strong></div>
       </div>
-
-      <button class="btn btn-danger btn-sm" style="margin-top:auto;" onclick="leaveGame()">🚪 Leave Quest</button>
+      <button class="btn btn-danger btn-sm" style="margin-top:auto;" onclick="leaveGame()">🚪 I Want To Go Home</button>
     </aside>
 
   </div>
 
-  <!-- DM OVERLAY (full-screen narrative for big moments) -->
-  <div class="dm-overlay" id="dm-overlay">
-    <div class="dm-overlay-inner">
-      <div class="dm-overlay-label">🎲 THE DUNGEON MASTER SPEAKS</div>
-      <div class="dm-overlay-text" id="dm-overlay-text"></div>
-      <button class="btn btn-gold" onclick="closeDMOverlay()">Continue →</button>
-    </div>
-  </div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-  <script src="js/firebase-config.js"></script>
-  <script src="js/game.js"></script>
+    const firebaseConfig = {
+      apiKey:            "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
+      authDomain:        "dungeon-crawler-geriatrics.firebaseapp.com",
+      databaseURL:       "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
+      projectId:         "dungeon-crawler-geriatrics",
+      storageBucket:     "dungeon-crawler-geriatrics.firebasestorage.app",
+      messagingSenderId: "967017118838",
+      appId:             "1:967017118838:web:fd4497925ca83bfb34b357"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+
+    // ── Boot ────────────────────────────────────────────────
+    const params   = new URLSearchParams(window.location.search);
+    const roomCode = params.get("room");
+    const me       = JSON.parse(sessionStorage.getItem("dungeon_player") || "null");
+    if (!roomCode || !me) { window.location.href = "index.html"; }
+
+    let roomData     = null;
+    let players      = [];
+    let myPlayer     = null;
+    let turnIndex    = 0;
+    let turnCount    = 0;
+    let roundCount   = 1;
+    let depth        = 1;
+    let aiHistory    = [];
+    let isDMThinking = false;
+    let renderedKeys = new Set();
+
+    document.getElementById("gh-room-code").textContent = roomCode;
+    document.getElementById("sess-room").textContent    = roomCode;
+
+    // Mark online
+    update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true });
+
+    // ── Firebase listener ───────────────────────────────────
+    onValue(ref(db, `rooms/${roomCode}`), snap => {
+      if (!snap.exists()) { window.location.href = "index.html"; return; }
+      roomData   = snap.val();
+      players    = Object.values(roomData.players||{}).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
+      myPlayer   = players.find(p=>p.id===me.id);
+      turnIndex  = roomData.turnIndex  || 0;
+      turnCount  = roomData.turnCount  || 0;
+      roundCount = roomData.roundCount || 1;
+      depth      = roomData.depth      || 1;
+
+      document.getElementById("gh-campaign").textContent      = roomData.campaign || "Dungeon Crawler Geriatrics";
+      document.getElementById("gh-location-name").textContent = roomData.location || "The Gates of Shadow";
+      document.getElementById("gh-depth").textContent         = `LEVEL ${depth}`;
+      document.getElementById("sess-turn").textContent        = turnCount + 1;
+      document.getElementById("sess-round").textContent       = roundCount;
+
+      renderParty();
+      renderTurnBar();
+      renderTurnOrder();
+      renderDepth();
+      renderPips();
+      syncLog(roomData.log || {});
+
+      // Host triggers opening narration once
+      if (me.isHost && Object.keys(roomData.log||{}).length === 0 && !isDMThinking) {
+        runOpeningNarration();
+      }
+    });
+
+    // ── Party Panel ─────────────────────────────────────────
+    function renderParty() {
+      document.getElementById("party-panel").innerHTML = players.map((p,i) => {
+        const isActive = i === turnIndex;
+        const hpPct    = Math.max(0, Math.min(100, ((p.hp ?? p.maxHp) / (p.maxHp||100)) * 100));
+        const mpPct    = Math.max(0, Math.min(100, ((p.mp ?? p.maxMp) / (p.maxMp||100)) * 100));
+        const hpClass  = hpPct > 60 ? "hp-high" : hpPct > 30 ? "hp-mid" : "hp-low";
+        return `
+          <div class="hero-mini ${p.heroClass||"warrior"} ${isActive?"active-turn":""} ${(p.hp??1)<=0?"fallen":""} ${p.id===me.id?"my-hero":""}">
+            ${isActive?`<div class="active-turn-badge">⚔ Acting</div>`:""}
+            <div class="hero-mini-top">
+              <div class="hero-mini-avatar">${p.heroEmoji||"⚔️"}</div>
+              <div>
+                <div class="hero-mini-name">${p.name}${p.id===me.id?` <span style="color:var(--gold-dim);font-size:.55rem">(YOU)</span>`:""}</div>
+                <div class="hero-mini-class">${p.heroName||"Hero"}</div>
+              </div>
+            </div>
+            <div class="hero-mini-bars">
+              <div class="bar-label-row"><span>HP</span><span>${p.hp??p.maxHp}/${p.maxHp}</span></div>
+              <div class="bar-track"><div class="bar-fill ${hpClass}" style="width:${hpPct}%"></div></div>
+              <div class="bar-label-row" style="margin-top:.3rem"><span>MP</span><span>${p.mp??p.maxMp}/${p.maxMp}</span></div>
+              <div class="bar-track"><div class="bar-fill mp" style="width:${mpPct}%"></div></div>
+            </div>
+            <div class="hero-mini-statuses">${(p.statuses||[]).map(s=>`<div class="status-badge status-${s}">${s}</div>`).join("")}${(p.hp??1)<=0?`<div class="status-badge status-dead">FALLEN</div>`:""}</div>
+          </div>`;
+      }).join("");
+    }
+
+    // ── Turn Bar ────────────────────────────────────────────
+    function renderTurnBar() {
+      const actor    = players[turnIndex];
+      const isMyTurn = actor?.id === me.id;
+
+      document.getElementById("turn-heroes").innerHTML = players.map((p,i) => `
+        <div class="turn-chip ${p.heroClass||"warrior"} ${i===turnIndex?"active":""}">
+          ${p.heroEmoji||"⚔️"} ${p.name.split(" ")[0]}
+        </div>`).join("");
+
+      const myEl   = document.getElementById("my-turn-panel");
+      const waitEl = document.getElementById("waiting-panel");
+      if (isMyTurn && !isDMThinking) {
+        myEl.style.display   = "block";
+        waitEl.style.display = "none";
+        document.getElementById("action-input").placeholder = `What does ${myPlayer?.name||"your hero"} do? (Besides regret coming here)`;
+      } else {
+        myEl.style.display   = "none";
+        waitEl.style.display = "flex";
+        document.getElementById("waiting-hero-icon").textContent = actor?.heroEmoji || "⚔️";
+        document.getElementById("waiting-hero-text").textContent = isDMThinking
+          ? "The Dungeon Master is weaving your inevitable doom..."
+          : `Waiting for ${actor?.name||"another hero"} to act...`;
+      }
+    }
+
+    function renderTurnOrder() {
+      document.getElementById("turn-order").innerHTML = players.map((p,i)=>`
+        <div class="to-item ${i===turnIndex?"current":""}">
+          <span class="to-num">${i+1}</span>
+          <span>${p.heroEmoji||"⚔️"}</span>
+          <span>${p.name}</span>
+          ${i===turnIndex?`<span style="margin-left:auto;font-size:.6rem;color:var(--gold)">◀ NOW</span>`:""}
+        </div>`).join("");
+    }
+
+    function renderDepth() {
+      document.querySelectorAll(".depth-pip").forEach((pip,i) => pip.classList.toggle("active", i+1===depth||(i===4&&depth>=5)));
+    }
+
+    function renderPips() {
+      document.getElementById("gh-pips").innerHTML = Array.from({length:4},(_,i)=>{
+        const p = players[i];
+        return `<div class="gh-pip ${p?.online?"online":""}" title="${p?p.name:"Empty"}"></div>`;
+      }).join("");
+    }
+
+    // ── Log ─────────────────────────────────────────────────
+    function syncLog(logObj) {
+      Object.entries(logObj).sort(([,a],[,b])=>(a.ts||0)-(b.ts||0)).forEach(([key,entry]) => {
+        if (renderedKeys.has(key)) return;
+        renderedKeys.add(key);
+        document.querySelector(".log-welcome")?.remove();
+        appendLogEntry(entry);
+      });
+    }
+
+    function appendLogEntry(entry) {
+      const log = document.getElementById("dungeon-log");
+      const div = document.createElement("div");
+      if (entry.type === "dm") {
+        div.className = "log-entry log-dm";
+        div.innerHTML = `<div class="log-speaker">🎲 DUNGEON MASTER 🎲</div><div class="log-body">${entry.text.replace(/\[([^\]]+)\]/g,'<span class="mechanic">[$1]</span>').replace(/\n/g,"<br>")}</div>`;
+      } else if (entry.type === "player") {
+        const p = players.find(p=>p.id===entry.playerId);
+        div.className = `log-entry log-player ${p?.heroClass||"warrior"}`;
+        div.innerHTML = `<div class="log-speaker">${entry.emoji||"⚔️"} ${(entry.playerName||"HERO").toUpperCase()}</div><div class="log-body">"${entry.text}"</div>`;
+      } else {
+        div.className = "log-entry log-system";
+        div.innerHTML = `<div class="log-body">— ${entry.text} —</div>`;
+      }
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function writeLog(entry) {
+      const key = `${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+      await set(ref(db, `rooms/${roomCode}/log/${key}`), {...entry, ts: Date.now()});
+    }
+
+    // ── Turn advance ────────────────────────────────────────
+    async function advanceTurn() {
+      let next = (turnIndex + 1) % players.length;
+      for (let i=0; i<players.length; i++) { if ((players[next]?.hp??1)>0) break; next=(next+1)%players.length; }
+      const newTurn  = turnCount + 1;
+      const newRound = Math.floor(newTurn / players.length) + 1;
+      await update(ref(db, `rooms/${roomCode}`), { turnIndex: next, turnCount: newTurn, roundCount: newRound });
+      if (newTurn % players.length === 0) await writeLog({ type:"system", text:`Round ${newRound} begins` });
+    }
+
+    // ── Opening narration ───────────────────────────────────
+    async function runOpeningNarration() {
+      isDMThinking = true;
+      setTyping(true); renderTurnBar();
+
+      const partyList = players.map(p=>`- ${p.name} the ${p.heroName} (HP:${p.maxHp}, MP:${p.maxMp})`).join("\n");
+      const opening = `Four middle-aged adventurers stand at the entrance of the Dungeon of Eternal Shadows. They did not plan to be here. Several of them have work tomorrow.\n\nThe party:\n${partyList}\n\nSet the scene dramatically! Describe the dungeon entrance with dark atmosphere and dread, but don't forget — these are regular people in their 40s who have somehow ended up on a dungeon adventure. Channel Dungeon Crawler Carl energy: gritty, funny, dangerous. End with their first challenge or choice.`;
+
+      const dmText = await callClaude(buildSystem(), opening);
+      aiHistory = [{role:"user",content:opening},{role:"assistant",content:dmText}];
+      await update(ref(db,`rooms/${roomCode}`), { aiHistory: JSON.stringify(aiHistory) });
+      await writeLog({ type:"dm", text:dmText });
+
+      isDMThinking = false; setTyping(false);
+    }
+
+    // ── Send action ─────────────────────────────────────────
+    window.sendAction = async function () {
+      const input = document.getElementById("action-input");
+      const text  = input.value.trim();
+      if (!text || isDMThinking) return;
+      if (players[turnIndex]?.id !== me.id) { showToast("It's not your turn!", true); return; }
+
+      input.value = "";
+      isDMThinking = true; setTyping(true); renderTurnBar();
+
+      await writeLog({ type:"player", playerId:me.id, playerName:myPlayer?.name||me.name, emoji:myPlayer?.heroEmoji||"⚔️", text });
+
+      const snap = await get(ref(db, `rooms/${roomCode}/aiHistory`));
+      if (snap.exists()) { try { aiHistory = JSON.parse(snap.val()); } catch(e){} }
+
+      const actor  = players[turnIndex];
+      const status = players.map(p=>`${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""}`).join(", ");
+      const msg    = `[Turn ${turnCount+1} | Round ${roundCount} | Depth ${depth}]\n${actor?.name} (${actor?.heroName}) acts: "${text}"\nParty: ${status}\n\nNarrate the result! Use [brackets] for all mechanics.`;
+
+      const dmText = await callClaude(buildSystem(), msg);
+      aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
+      await update(ref(db,`rooms/${roomCode}`), { aiHistory: JSON.stringify(aiHistory) });
+
+      // Parse HP changes
+      const updates = {};
+      const dmgRe = /\[(\w[\w\s]*?) takes (\d+) damage/gi; let m;
+      while((m=dmgRe.exec(dmText))!==null){const p=players.find(p=>p.name.toLowerCase().includes(m[1].toLowerCase())||m[1].toLowerCase().includes(p.name.toLowerCase().split(" ")[0]));if(p){updates[`players/${p.id}/hp`]=Math.max(0,(p.hp??p.maxHp)-parseInt(m[2]));}}
+      const healRe = /\[(\w[\w\s]*?) (?:heals?|recovers?) (\d+)/gi;
+      while((m=healRe.exec(dmText))!==null){const p=players.find(p=>p.name.toLowerCase().includes(m[1].toLowerCase())||m[1].toLowerCase().includes(p.name.toLowerCase().split(" ")[0]));if(p){updates[`players/${p.id}/hp`]=Math.min(p.maxHp,(p.hp??p.maxHp)+parseInt(m[2]));}}
+      if(Object.keys(updates).length) await update(ref(db,`rooms/${roomCode}`),updates);
+
+      await writeLog({ type:"dm", text:dmText });
+      await advanceTurn();
+
+      isDMThinking = false; setTyping(false);
+    };
+
+    window.quickAction = t => { document.getElementById("action-input").value = t; window.sendAction(); };
+    window.handleKey   = e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();window.sendAction();} };
+
+    // ── System prompt ───────────────────────────────────────
+    function buildSystem() {
+      return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a dark fantasy dungeon crawler where four people in their 40s have been dragged into a dungeon against their better judgment. Think Dungeon Crawler Carl vibes: gritty, dangerous, genuinely threatening monsters AND darkly funny moments. These aren't young heroes — they have back problems, read glasses, and keep wondering if they can reschedule this.
+
+PARTY:
+${players.map(p=>`- ${p.name} (${p.heroName}, HP:${p.hp??p.maxHp}/${p.maxHp}, MP:${p.mp??p.maxMp}/${p.maxMp})`).join("\n")}
+
+Current location: ${roomData?.location||"The Gates of Shadow"} (Depth Level ${depth})
+
+RULES:
+- Narrate vividly. Rich dark fantasy mixed with middle-aged exhaustion.
+- React to player actions with real consequences.
+- Use [brackets] for ALL mechanics: [Dave takes 15 damage! HP: 105/120]
+- Keep responses 150-300 words. End with a clear choice or challenge.
+- The dungeon has 5 levels. Final boss: The Shadow Lich (who also has back problems).
+- Be fair but dangerous. Death is possible. Embarrassment is certain.`;
+    }
+
+    // ── Claude API ──────────────────────────────────────────
+    async function callClaude(system, userMsg) {
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            system,
+            messages: [...aiHistory, {role:"user",content:userMsg}]
+          })
+        });
+        const data = await res.json();
+        return data.content?.[0]?.text || "The dungeon master has momentarily misplaced their reading glasses...";
+      } catch(err) {
+        console.error(err);
+        return "⚠ The crystal ball flickered. Try again.";
+      }
+    }
+
+    function setTyping(on) { document.getElementById("dm-typing").classList.toggle("visible", on); }
+
+    window.leaveGame = function() {
+      if(confirm("Abandon your quest and go home?")) {
+        update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
+        sessionStorage.removeItem("dungeon_player");
+        window.location.href="index.html";
+      }
+    };
+
+    function showToast(msg, isError) {
+      let t = document.getElementById("__toast");
+      if(!t){t=document.createElement("div");t.id="__toast";t.className="toast";document.body.appendChild(t);}
+      t.textContent=msg; t.className="toast"+(isError?" error":"");
+      requestAnimationFrame(()=>t.classList.add("show"));
+      setTimeout(()=>t.classList.remove("show"),2500);
+    }
+  </script>
 </body>
 </html>
