@@ -210,6 +210,153 @@
       margin-top: 0.3rem;
     }
 </style>
+<style>
+    /* ── Dice Tray ── */
+    .dice-fab {
+      position: fixed;
+      bottom: 5.5rem;
+      right: 1.2rem;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 1px solid var(--sys-gold-dim);
+      background: var(--sys-panel);
+      color: var(--sys-gold);
+      font-size: 1.3rem;
+      cursor: pointer;
+      z-index: 500;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 14px rgba(255,204,68,0.2);
+      transition: all 0.2s;
+    }
+    .dice-fab:hover { box-shadow: 0 0 24px rgba(255,204,68,0.5); border-color: var(--sys-gold); transform: scale(1.08); }
+
+    .dice-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 600;
+      align-items: flex-end;
+      justify-content: flex-end;
+      padding: 1rem 1.2rem 6rem 1.2rem;
+      pointer-events: none;
+    }
+    .dice-overlay.open { display: flex; }
+
+    .dice-tray {
+      background: var(--sys-panel);
+      border: 1px solid var(--sys-border2);
+      box-shadow: 0 0 40px rgba(255,204,68,0.12);
+      width: 280px;
+      padding: 1rem;
+      pointer-events: all;
+      animation: tray-in 0.18s ease;
+    }
+    @keyframes tray-in {
+      from { opacity:0; transform: translateY(12px) scale(0.97); }
+      to   { opacity:1; transform: translateY(0)    scale(1); }
+    }
+
+    .dice-tray-hd {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.25em;
+      color: var(--sys-gold);
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dice-tray-close {
+      cursor: pointer; color: var(--sys-text-dim); font-size: 0.6rem;
+      background: none; border: none; outline: none;
+      font-family: 'Share Tech Mono', monospace; letter-spacing: 0.1em;
+    }
+    .dice-tray-close:hover { color: var(--sys-red); }
+
+    .dice-set {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .die-btn {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      padding: 0.6rem 0.4rem;
+      border: 1px solid var(--sys-border2);
+      background: transparent;
+      color: var(--sys-text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+      outline: none;
+      text-align: center;
+    }
+    .die-btn:hover { border-color: var(--sys-gold); color: var(--sys-gold); background: rgba(255,204,68,0.05); }
+    .die-btn.rolling { animation: die-shake 0.35s ease; border-color: var(--sys-gold); color: var(--sys-gold); }
+    @keyframes die-shake {
+      0%,100% { transform: rotate(0deg); }
+      20%  { transform: rotate(-8deg) scale(1.1); }
+      40%  { transform: rotate(8deg)  scale(1.1); }
+      60%  { transform: rotate(-5deg); }
+      80%  { transform: rotate(5deg); }
+    }
+
+    .dice-modifier {
+      display: flex; align-items: center; gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+    .dice-modifier label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem; color: var(--sys-text-dim); letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+    .dice-modifier input {
+      width: 52px; padding: 0.3rem 0.4rem;
+      background: transparent; border: 1px solid var(--sys-border);
+      color: var(--sys-text); font-family: 'Share Tech Mono', monospace; font-size: 0.7rem;
+      outline: none; text-align: center;
+    }
+
+    .dice-visibility {
+      display: flex; gap: 0.4rem; margin-bottom: 0.75rem;
+    }
+    .vis-btn {
+      flex: 1;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem; letter-spacing: 0.08em;
+      padding: 0.35rem; border: 1px solid var(--sys-border);
+      background: transparent; color: var(--sys-text-dim);
+      cursor: pointer; outline: none; transition: all 0.15s;
+    }
+    .vis-btn.active-pub { border-color: var(--sys-glow); color: var(--sys-glow); background: rgba(0,212,255,0.05); }
+    .vis-btn.active-sec { border-color: var(--sys-purple); color: var(--sys-purple); background: rgba(155,109,255,0.05); }
+
+    .dice-result {
+      text-align: center;
+      min-height: 60px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 1px solid var(--sys-border);
+      background: rgba(0,0,0,0.3);
+      margin-top: 0.3rem;
+      padding: 0.5rem;
+    }
+    .dice-result-num {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: 2rem;
+      color: var(--sys-gold);
+      text-shadow: 0 0 16px rgba(255,204,68,0.5);
+      line-height: 1;
+      transition: all 0.2s;
+    }
+    .dice-result-num.crit { color: var(--sys-green); text-shadow: 0 0 20px rgba(0,255,136,0.7); }
+    .dice-result-num.fail { color: var(--sys-red);   text-shadow: 0 0 20px rgba(255,51,85,0.7); }
+    .dice-result-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem; color: var(--sys-text-faint); letter-spacing: 0.15em;
+      margin-top: 0.25rem;
+    }
+</style>
 </head>
 <body class="game-page">
 
@@ -1244,6 +1391,97 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       }
     }
 
+
+    // ── Dice Tray ─────────────────────────────────────────────
+    let diceVisibility = 'public';
+
+    window.toggleDiceTray = function() {
+      const overlay = document.getElementById('dice-overlay');
+      overlay.classList.toggle('open');
+    };
+
+    window.setVisibility = function(v) {
+      diceVisibility = v;
+      document.getElementById('vis-pub').className = 'vis-btn' + (v==='public'?' active-pub':'');
+      document.getElementById('vis-sec').className = 'vis-btn' + (v==='secret'?' active-sec':'');
+    };
+
+    window.rollDie = async function(sides, btn) {
+      const count = Math.max(1, Math.min(10, parseInt(document.getElementById('dice-count').value)||1));
+      const mod   = parseInt(document.getElementById('dice-mod').value)||0;
+
+      // Shake animation
+      btn.classList.add('rolling');
+      setTimeout(() => btn.classList.remove('rolling'), 380);
+
+      // Roll
+      const rolls = Array.from({length: count}, () => Math.floor(Math.random() * sides) + 1);
+      const rawTotal = rolls.reduce((a,b) => a+b, 0);
+      const total    = rawTotal + mod;
+      const isCrit   = sides === 20 && count === 1 && rolls[0] === 20;
+      const isFail   = sides === 20 && count === 1 && rolls[0] === 1;
+
+      // Display result
+      const resultEl = document.getElementById('dice-result');
+      const label = count > 1
+        ? `${count}d${sides}${mod>=0?'+':''}${mod} = [${rolls.join('+')}]${mod?`+${mod}`:''}`
+        : `d${sides}${mod>0?'+'+mod:mod<0?mod:''} ${isCrit?'— CRITICAL!':isFail?'— FUMBLE!':''}`;
+      resultEl.innerHTML = `
+        <div class="dice-result-num ${isCrit?'crit':isFail?'fail':''}">${total}</div>
+        <div class="dice-result-label">${label}</div>`;
+
+      // Play a little roll sound
+      try {
+        const ctx = getAudioCtx();
+        const t = ctx.currentTime;
+        [1,2,3].forEach((_, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'triangle';
+          o.frequency.setValueAtTime(200 + Math.random()*300, t + i*0.07);
+          g.gain.setValueAtTime(0.12, t + i*0.07);
+          g.gain.exponentialRampToValueAtTime(0.001, t + i*0.07 + 0.12);
+          o.start(t + i*0.07); o.stop(t + i*0.07 + 0.12);
+        });
+        // Final ding on result
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine';
+        o.frequency.value = isCrit ? 1400 : isFail ? 200 : 800;
+        g.gain.setValueAtTime(0.2, t + 0.25);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+        o.start(t + 0.25); o.stop(t + 0.7);
+      } catch(e) {}
+
+      // Post to log
+      const playerName = myPlayer?.name || me.name;
+      const rollStr = count > 1
+        ? `${count}d${sides}${mod>=0?'+':''}${mod} → ${total} [${rolls.join(', ')}]`
+        : `d${sides}${mod>0?'+'+mod:mod<0?mod:''} → ${total}${isCrit?' 🌟 CRITICAL!':isFail?' 💀 FUMBLE!':''}`;
+
+      if (diceVisibility === 'public') {
+        await writeGroupLog({ type: 'roll', text: rollStr, playerName });
+      } else {
+        // Secret — write to private log only, DM sees via system
+        const key = push(ref(db, `rooms/${roomCode}/players/${me.id}/privateLog`)).key;
+        await set(ref(db, `rooms/${roomCode}/players/${me.id}/privateLog/${key}`), {
+          from: 'me', text: `🎲 SECRET ROLL: ${rollStr}`, ts: Date.now()
+        });
+        // Show locally
+        const resultArea = document.getElementById('private-log');
+        if (resultArea) {
+          const div = document.createElement('div');
+          div.className = 'private-entry from-me';
+          div.innerHTML = `<div class="pe-who">🎲 SECRET ROLL</div><div class="pe-body">${rollStr}</div>`;
+          resultArea.querySelector('.private-empty')?.remove();
+          resultArea.appendChild(div);
+          resultArea.scrollTop = resultArea.scrollHeight;
+        }
+      }
+    };
+
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
         update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
@@ -1270,6 +1508,45 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       <div class="stat-modal-grid" id="smd-grid"></div>
       <div class="stat-modal-bars" id="smd-bars"></div>
       <div class="stat-modal-statuses" id="smd-statuses"></div>
+    </div>
+  </div>
+
+
+  <!-- Dice FAB -->
+  <button class="dice-fab" onclick="toggleDiceTray()" title="Roll dice">🎲</button>
+
+  <!-- Dice Tray Overlay -->
+  <div class="dice-overlay" id="dice-overlay">
+    <div class="dice-tray">
+      <div class="dice-tray-hd">
+        <span>// DICE TRAY</span>
+        <button class="dice-tray-close" onclick="toggleDiceTray()">[ CLOSE ]</button>
+      </div>
+
+      <div class="dice-set">
+        <button class="die-btn" onclick="rollDie(4,  this)">d4</button>
+        <button class="die-btn" onclick="rollDie(6,  this)">d6</button>
+        <button class="die-btn" onclick="rollDie(8,  this)">d8</button>
+        <button class="die-btn" onclick="rollDie(10, this)">d10</button>
+        <button class="die-btn" onclick="rollDie(12, this)">d12</button>
+        <button class="die-btn" onclick="rollDie(20, this)" id="d20-btn">d20</button>
+      </div>
+
+      <div class="dice-modifier">
+        <label>MODIFIER:</label>
+        <input type="number" id="dice-mod" value="0" min="-10" max="20">
+        <label style="margin-left:.5rem">COUNT:</label>
+        <input type="number" id="dice-count" value="1" min="1" max="10" style="width:40px">
+      </div>
+
+      <div class="dice-visibility">
+        <button class="vis-btn active-pub" id="vis-pub" onclick="setVisibility('public')">📡 PUBLIC</button>
+        <button class="vis-btn" id="vis-sec" onclick="setVisibility('secret')">🔒 SECRET</button>
+      </div>
+
+      <div class="dice-result" id="dice-result">
+        <div class="dice-result-label">CLICK A DIE TO ROLL</div>
+      </div>
     </div>
   </div>
 
