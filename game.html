@@ -1116,9 +1116,29 @@ OPENING SCENE RULES — follow these exactly:
       // Log player action publicly
       await writeGroupLog({type:"player",pid:me.id,pname:myPlayer?.name||me.name,emoji:myPlayer?.heroEmoji||"?",text});
 
-      // Load latest AI history
+      // Load latest AI history — trim to last 12 exchanges to prevent context bloat
       const snap = await get(ref(db,`rooms/${roomCode}/aiHistory`));
       if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
+      if (aiHistory.length > 24) aiHistory = aiHistory.slice(-24); // keep last 12 exchanges
+
+      // Build a live game state summary injected at the TOP of every message
+      // This is the DM's "cheat sheet" — what has been decided, what exists, what happened
+      const assignedClasses = players.filter(p=>p.heroClass).map(p=>`${p.name}=${p.heroClass}`).join(", ") || "none yet";
+      const allInventories  = players.map(p=>{
+        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ")||"empty";
+        return `${p.name}: [${inv}]`;
+      }).join(" | ");
+      const allSkills = players.map(p=>{
+        const sk = Object.values(p.skills||{}).map(s=>s.name).join(", ")||"none";
+        return `${p.name}: ${sk}`;
+      }).join(" | ");
+      const gameStateSummary = `=== LIVE GAME STATE (authoritative) ===
+Location: ${roomData?.location||"Entry Chamber"} | Depth: ${depth}/5 | Turn: ${turnCount+1} | Round: ${roundCount}
+Classes assigned: ${assignedClasses}
+Inventories: ${allInventories}
+Skills: ${allSkills}
+HP: ${players.map(p=>`${p.name}:${p.hp??p.maxHp}/${p.maxHp}`).join(", ")}
+======================================`;
 
       const actor  = players[turnIndex];
       const actorInv = Object.values(actor?.inventory||{}).map(i=>`"${i.name}"`).join(", ") || "nothing";
@@ -1128,14 +1148,15 @@ OPENING SCENE RULES — follow these exactly:
         const fallen = (p.hp??1)<=0 ? " [FALLEN]" : "";
         return `${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${fallen} Class:${p.heroClass||"???"}`;
       }).join(" | ");
-      const msg = `[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]
+      const msg = `${gameStateSummary}
+[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]
 ACTING PLAYER: ${actor?.name} (HP:${actor?.hp??actor?.maxHp}/${actor?.maxHp} | Class:${actor?.heroClass||"UNASSIGNED"})
   Inventory: [${actorInv}]
   Skills: ${actorSkills}
   Action: "${text}"
 Party status: ${pStatus}
 
-Narrate the result. System prompt has full party details. {LOOT: name — desc} for new items. {TRANSFER: name — from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] if behavior warrants it.`;
+Narrate the result. {LOOT: name — desc} for new items. {TRANSFER: name — from:X to:Y} to move items. If this action strongly reveals a class, NOW use [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!] — only use this tag when assigning, never mention a class without it.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
@@ -1330,27 +1351,21 @@ Narrate the result. System prompt has full party details. {LOOT: name — desc} 
       // Class assignment
       const validClasses=["warrior","rogue","mage","paladin","bard","ranger","summoner","berserker","scholar","monk","druid","necromancer","tinkerer","cleric"];
 
-      // Pattern 1: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-      const classRe=/CLASS ASSIGNMENT[^!\n]*?(\w[\w\s]+?) is now (?:a |an )?(\w+)/i;
-      // Pattern 2: "Name is a/the ClassName" anywhere in text
-      const classRe2=new RegExp(`(${players.map(p=>p.name.split(" ")[0]).join("|")}) (?:is now |is |has become |has been revealed as |—\s*)(?:a |an |the )?(${validClasses.join("|")})`, "i");
-
-      for (const re of [classRe, classRe2]) {
-        const classMatch = text.match(re);
-        if (classMatch) {
-          const playerName = classMatch[1].trim();
-          const className  = classMatch[2].toLowerCase();
-          const matchedClass = validClasses.find(c => className.includes(c));
-          if (matchedClass) {
-            const p = findPlayer(playerName);
-            if (p && !p.heroClass) {
-              updates[`players/${p.id}/heroClass`] = matchedClass;
-              updates[`players/${p.id}/heroEmoji`] = classEmoji(matchedClass);
-              setTimeout(async () => {
-                await writeGroupLog({type:"sys",sclass:"class-reveal",text:`⚡ SYSTEM: CLASS ASSIGNMENT — ${p.name} has been designated: ${matchedClass.toUpperCase()} ⚡`});
-              }, 500);
-              break;
-            }
+      // ONLY assign class from explicit [SYSTEM: CLASS ASSIGNMENT] tag — never from casual mention
+      const classRe=/\[SYSTEM:\s*CLASS ASSIGNMENT[^\]]*?(\w[\w\s]+?) is now (?:a |an )?(\w[\w\s]+?)\s*[!\]]/i;
+      const classMatch = text.match(classRe);
+      if (classMatch) {
+        const playerName = classMatch[1].trim();
+        const className  = classMatch[2].toLowerCase().trim();
+        const matchedClass = validClasses.find(c => className.includes(c)) || className.split(' ')[0];
+        if (matchedClass) {
+          const p = findPlayer(playerName);
+          if (p) { // assign even if already has class — DM might be upgrading/changing
+            updates[`players/${p.id}/heroClass`] = matchedClass;
+            updates[`players/${p.id}/heroEmoji`] = classEmoji(matchedClass);
+            setTimeout(async () => {
+              await writeGroupLog({type:"sys",sclass:"class-reveal",text:`⚡ SYSTEM: CLASS ASSIGNMENT — ${p.name} has been designated: ${matchedClass.toUpperCase()} ⚡`});
+            }, 500);
           }
         }
       }
