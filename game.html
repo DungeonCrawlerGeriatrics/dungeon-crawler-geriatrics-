@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dungeon of Eternal Shadows — In Progress</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body class="game-page">
+
+  <!-- HEADER BAR -->
+  <header class="game-header">
+    <div class="gh-left">
+      <span class="gh-logo">⚔️</span>
+      <span class="gh-campaign" id="gh-campaign">Loading...</span>
+    </div>
+    <div class="gh-center">
+      <div class="gh-location">
+        <span class="gh-loc-icon">🗺️</span>
+        <span id="gh-location-name">The Gates of Shadow</span>
+        <span class="gh-depth" id="gh-depth">LEVEL 1</span>
+      </div>
+    </div>
+    <div class="gh-right">
+      <span class="gh-code-label">ROOM</span>
+      <span class="gh-code" id="gh-room-code">????</span>
+      <div class="gh-pips" id="gh-pips"></div>
+    </div>
+  </header>
+
+  <div class="game-layout">
+
+    <!-- ===== LEFT: PARTY PANEL ===== -->
+    <aside class="panel panel-left">
+      <div class="panel-hd">⚔ Your Party</div>
+      <div id="party-panel">
+        <!-- Hero cards injected by JS -->
+      </div>
+
+      <div class="panel-hd" style="margin-top:1rem;">🎒 Inventory</div>
+      <div class="inventory-list" id="inventory-list">
+        <div class="inv-item"><span>🧪</span> Healing Potion <em>×4</em></div>
+        <div class="inv-item"><span>🕯️</span> Torch <em>×6</em></div>
+        <div class="inv-item"><span>🗺️</span> Old Map Fragment</div>
+        <div class="inv-item"><span>🪙</span> Gold Coins <em>×20</em></div>
+      </div>
+    </aside>
+
+    <!-- ===== CENTER: DUNGEON LOG + INPUT ===== -->
+    <main class="panel panel-center">
+
+      <!-- LOG -->
+      <div class="dungeon-log" id="dungeon-log">
+        <div class="log-welcome">
+          <div class="log-welcome-icon">🏰</div>
+          <div class="log-welcome-text">Your adventure is about to begin...</div>
+        </div>
+      </div>
+
+      <!-- TYPING INDICATOR -->
+      <div class="dm-typing" id="dm-typing">
+        <span class="dm-typing-label">🎲 The Dungeon Master stirs...</span>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      </div>
+
+      <!-- INPUT ZONE -->
+      <div class="input-zone">
+
+        <!-- WHOSE TURN -->
+        <div class="turn-bar" id="turn-bar">
+          <span class="turn-label">ACTING:</span>
+          <div class="turn-heroes" id="turn-heroes"></div>
+        </div>
+
+        <!-- MY TURN PANEL (shown when it's your turn) -->
+        <div class="my-turn-panel" id="my-turn-panel">
+          <div class="quick-actions" id="quick-actions">
+            <button class="qa-btn" onclick="quickAction('I search the area carefully for traps, secrets, or anything useful.')">🔍 Search</button>
+            <button class="qa-btn" onclick="quickAction('I use a healing potion to restore my wounds.')">🧪 Heal</button>
+            <button class="qa-btn" onclick="quickAction('I attempt to rest briefly and catch my breath.')">💤 Rest</button>
+            <button class="qa-btn" onclick="quickAction('I look around and describe what I observe to my party.')">👁️ Look</button>
+          </div>
+          <div class="input-row">
+            <textarea
+              class="action-textarea"
+              id="action-input"
+              placeholder="What do you do?"
+              onkeydown="handleKey(event)"
+              rows="2"
+            ></textarea>
+            <button class="btn btn-ember btn-send" id="btn-send" onclick="sendAction()">
+              ⚡<br><span>Act</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- WAITING FOR OTHERS (shown when it's not your turn) -->
+        <div class="waiting-panel" id="waiting-panel" style="display:none;">
+          <div class="waiting-hero-icon" id="waiting-hero-icon">⚔️</div>
+          <div class="waiting-hero-text" id="waiting-hero-text">Waiting for another hero to act...</div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ===== RIGHT: WORLD PANEL ===== -->
+    <aside class="panel panel-right">
+
+      <div class="panel-hd">⚡ Quick Info</div>
+      <div class="info-card" id="encounter-card" style="display:none">
+        <div class="info-card-title" style="color:#ff7070;">⚔ Active Encounter</div>
+        <div id="encounter-content"></div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-title">🏰 Dungeon Depth</div>
+        <div class="depth-track" id="depth-track">
+          <div class="depth-pip active">1</div>
+          <div class="depth-pip">2</div>
+          <div class="depth-pip">3</div>
+          <div class="depth-pip">4</div>
+          <div class="depth-pip skull">💀</div>
+        </div>
+      </div>
+
+      <div class="panel-hd">📜 Turn Order</div>
+      <div class="turn-order" id="turn-order"></div>
+
+      <div class="panel-hd">⚙ Session</div>
+      <div class="session-info">
+        <div class="sess-row"><span>Room</span><strong id="sess-room">????</strong></div>
+        <div class="sess-row"><span>Turn</span><strong id="sess-turn">1</strong></div>
+        <div class="sess-row"><span>Round</span><strong id="sess-round">1</strong></div>
+      </div>
+
+      <button class="btn btn-danger btn-sm" style="margin-top:auto;" onclick="leaveGame()">🚪 Leave Quest</button>
+    </aside>
+
+  </div>
+
+  <!-- DM OVERLAY (full-screen narrative for big moments) -->
+  <div class="dm-overlay" id="dm-overlay">
+    <div class="dm-overlay-inner">
+      <div class="dm-overlay-label">🎲 THE DUNGEON MASTER SPEAKS</div>
+      <div class="dm-overlay-text" id="dm-overlay-text"></div>
+      <button class="btn btn-gold" onclick="closeDMOverlay()">Continue →</button>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

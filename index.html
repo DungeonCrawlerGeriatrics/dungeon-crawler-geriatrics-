@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dungeon of Eternal Shadows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/lobby.css">
+</head>
+<body class="lobby-page">
+
+  <!-- Ambient particles -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Torches -->
+  <div class="torch torch-tl" aria-hidden="true">🔥</div>
+  <div class="torch torch-tr" aria-hidden="true">🔥</div>
+
+  <main class="lobby-wrap">
+
+    <!-- HERO SIGIL -->
+    <div class="sigil-wrap">
+      <div class="sigil-ring outer"></div>
+      <div class="sigil-ring inner"></div>
+      <div class="sigil-icon">⚔️</div>
+    </div>
+
+    <h1 class="title-main">Dungeon of<br>Eternal Shadows</h1>
+    <div class="title-rule"><span>✦</span></div>
+    <p class="title-tagline">A Real-Time AI Dungeon Master Experience<br>for Four Brave Souls</p>
+
+    <!-- LOBBY CARD -->
+    <div class="lobby-card">
+
+      <!-- CREATE -->
+      <section class="lobby-section" id="section-create">
+        <h2 class="section-heading">⚔ Forge a New Campaign</h2>
+        <p class="section-desc">Create a room and share the code with three companions.</p>
+        <div class="input-group">
+          <label class="input-label" for="host-name">Your Name</label>
+          <input class="text-input" id="host-name" type="text" placeholder="Aragorn" maxlength="20" autocomplete="off">
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="campaign-name">Campaign Name <span class="optional">(optional)</span></label>
+          <input class="text-input" id="campaign-name" type="text" placeholder="The Shadow Lich's Keep" maxlength="40" autocomplete="off">
+        </div>
+        <button class="btn btn-gold" id="btn-create" onclick="createRoom()">
+          <span class="btn-icon">🏰</span> Create Campaign
+        </button>
+      </section>
+
+      <div class="lobby-or"><span>— or —</span></div>
+
+      <!-- JOIN -->
+      <section class="lobby-section" id="section-join">
+        <h2 class="section-heading">🗡 Join a Campaign</h2>
+        <p class="section-desc">Enter the room code your party leader shared.</p>
+        <div class="input-group">
+          <label class="input-label" for="join-name">Your Name</label>
+          <input class="text-input" id="join-name" type="text" placeholder="Legolas" maxlength="20" autocomplete="off">
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="room-code">Room Code</label>
+          <input class="text-input room-code-input" id="room-code" type="text" placeholder="ABCD" maxlength="6" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <button class="btn btn-ember" id="btn-join" onclick="joinRoom()">
+          <span class="btn-icon">🚪</span> Enter the Dungeon
+        </button>
+      </section>
+
+    </div>
+
+    <!-- ERROR -->
+    <div class="error-toast" id="error-toast"></div>
+
+    <footer class="lobby-footer">
+      Powered by Claude AI · Dark Fantasy Edition · <span id="online-count">Loading...</span>
+    </footer>
+
+  </main>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/lobby.js"></script>
+</body>
+</html>

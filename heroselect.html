@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Choose Your Hero — Dungeon of Eternal Shadows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/heroselect.css">
+</head>
+<body class="heroselect-page">
+
+  <canvas id="particle-canvas"></canvas>
+  <div class="torch torch-tl">🔥</div>
+  <div class="torch torch-tr">🔥</div>
+  <div class="torch torch-bl">🔥</div>
+  <div class="torch torch-br">🔥</div>
+
+  <!-- ROOM INFO BAR -->
+  <header class="room-bar">
+    <div class="room-bar-left">
+      <span class="room-bar-label">CAMPAIGN</span>
+      <span class="room-bar-value" id="campaign-title">The Shadow Lich's Keep</span>
+    </div>
+    <div class="room-bar-center">
+      <span class="room-bar-label">ROOM CODE</span>
+      <span class="room-bar-code" id="display-room-code">????</span>
+      <button class="copy-btn" onclick="copyRoomCode()" title="Copy code">📋</button>
+    </div>
+    <div class="room-bar-right">
+      <span class="room-bar-label">PLAYERS</span>
+      <div class="player-pips" id="player-pips"></div>
+    </div>
+  </header>
+
+  <main class="heroselect-main">
+    <div class="hs-header">
+      <h1 class="hs-title">Choose Your Hero</h1>
+      <p class="hs-subtitle">Each player selects one class. Taken classes are shown in grey.</p>
+    </div>
+
+    <!-- HERO GRID -->
+    <div class="hero-grid" id="hero-grid">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- PARTY ROSTER -->
+    <div class="roster-panel">
+      <div class="roster-title">⚔ Party Roster</div>
+      <div class="roster-list" id="roster-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- WAITING / READY -->
+    <div class="ready-zone" id="ready-zone">
+      <div class="waiting-msg" id="waiting-msg">
+        <div class="waiting-spinner">🔮</div>
+        <span>Waiting for all players to choose their heroes...</span>
+      </div>
+      <button class="btn btn-gold btn-xl" id="btn-begin" style="display:none" onclick="beginAdventure()">
+        ⚔ Begin the Adventure
+      </button>
+    </div>
+  </main>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/heroselect.js"></script>
+</body>
+</html>
