@@ -94,6 +94,122 @@
     .pm-send-btn.player-send { border-color: var(--sys-glow-dim); color: var(--sys-glow); }
     .pm-send-btn.player-send:hover { background: rgba(0,212,255,0.06); box-shadow: 0 0 10px rgba(0,212,255,0.2); }
 </style>
+<style>
+    /* ── Stat Card Modal ── */
+    .stat-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(3px);
+    }
+    .stat-modal-overlay.open { display: flex; }
+
+    .stat-modal {
+      background: var(--sys-panel);
+      border: 1px solid var(--sys-border2);
+      box-shadow: 0 0 40px rgba(0,212,255,0.15);
+      width: min(420px, 92vw);
+      padding: 1.5rem;
+      position: relative;
+      animation: modal-in 0.15s ease;
+    }
+    @keyframes modal-in {
+      from { opacity:0; transform: scale(0.95) translateY(8px); }
+      to   { opacity:1; transform: scale(1)   translateY(0); }
+    }
+
+    .stat-modal-close {
+      position: absolute;
+      top: 0.75rem; right: 0.75rem;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--sys-text-dim);
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      background: none; border: none; outline: none;
+    }
+    .stat-modal-close:hover { color: var(--sys-red); }
+
+    .stat-modal-name {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1rem;
+      color: var(--sys-text);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.2rem;
+    }
+    .stat-modal-class {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      margin-bottom: 1rem;
+    }
+    .stat-modal-class.revealed { color: var(--sys-gold); }
+    .stat-modal-class.unknown  { color: var(--sys-text-faint); }
+
+    .stat-modal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 1.2rem;
+    }
+    .stat-modal-cell {
+      border: 1px solid var(--sys-border);
+      padding: 0.75rem 0.5rem;
+      text-align: center;
+      background: rgba(0,0,0,0.3);
+    }
+    .stat-modal-cell .smc-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      color: var(--sys-text-dim);
+      margin-bottom: 0.35rem;
+    }
+    .stat-modal-cell .smc-val {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .stat-modal-cell .smc-mod {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--sys-text-dim);
+      margin-top: 0.2rem;
+    }
+    .stat-modal-cell.high .smc-val { color: var(--sys-gold); text-shadow: 0 0 8px rgba(255,204,68,0.4); }
+    .stat-modal-cell.low  .smc-val { color: var(--sys-red); }
+    .stat-modal-cell.mid  .smc-val { color: var(--sys-text); }
+
+    .stat-modal-bars { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+    .smb-row { display: flex; align-items: center; gap: 0.75rem; }
+    .smb-label { font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--sys-text-dim); width: 2.5rem; }
+    .smb-nums  { font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--sys-text-dim); margin-left: auto; white-space: nowrap; }
+    .smb-track { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--sys-border); }
+    .smb-fill  { height: 100%; transition: width 0.4s ease; }
+
+    .stat-modal-statuses {
+      display: flex; flex-wrap: wrap; gap: 0.35rem;
+      min-height: 1.5rem;
+    }
+
+    /* Make hero cards clickable */
+    .hero-card { cursor: pointer; transition: border-color 0.15s; }
+    .hero-card:hover { border-color: var(--sys-glow-dim); }
+    .hero-card:hover::after {
+      content: 'CLICK TO EXPAND';
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.48rem;
+      letter-spacing: 0.2em;
+      color: var(--sys-text-faint);
+      display: block;
+      text-align: center;
+      margin-top: 0.3rem;
+    }
+</style>
 </head>
 <body class="game-page">
 
@@ -334,7 +450,7 @@
         const statKeys = ["STR","DEX","CON","INT","WIS","CHA"];
 
         return `
-        <div class="hero-card ${isActive?"active-turn":""} ${isMe?"my-card":""} ${(p.hp??1)<=0?"fallen":""}">
+        <div class="hero-card ${isActive?"active-turn":""} ${isMe?"my-card":""} ${(p.hp??1)<=0?"fallen":""}" onclick="openStatModal('${p.id}')">
           ${isActive?`<div class="acting-tag">◀ ACTING</div>`:""}
           <div class="hero-card-top">
             <div class="hero-avatar">${p.heroEmoji||"?"}</div>
@@ -936,6 +1052,65 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); window.sendPlayerPm(targetId); }
     };
 
+
+    // ── Stat Card Modal ─────────────────────────────────────
+    window.openStatModal = function(playerId) {
+      const p = players.find(x => x.id === playerId);
+      if (!p) return;
+      const stats = p.stats || {STR:"?",DEX:"?",CON:"?",INT:"?",WIS:"?",CHA:"?"};
+      const statKeys = ["STR","DEX","CON","INT","WIS","CHA"];
+      const statDescs = {STR:"Strength",DEX:"Dexterity",CON:"Constitution",INT:"Intelligence",WIS:"Wisdom",CHA:"Charisma"};
+
+      document.getElementById("smd-name").textContent = (p.heroEmoji||"?") + "  " + p.name;
+      const classEl = document.getElementById("smd-class");
+      classEl.textContent = p.heroClass ? `[ ${p.heroClass.toUpperCase()} ]` : "[ CLASS: ??? — BEHAVIOR OBSERVED ]";
+      classEl.className = "stat-modal-class " + (p.heroClass ? "revealed" : "unknown");
+
+      document.getElementById("smd-grid").innerHTML = statKeys.map(k => {
+        const v = parseInt(stats[k]) || 0;
+        const mod = Math.floor((v - 10) / 2);
+        const tier = v >= 10 ? "high" : v >= 7 ? "mid" : "low";
+        const modStr = mod >= 0 ? "+" + mod : "" + mod;
+        return `<div class="stat-modal-cell ${tier}">
+          <div class="smc-label">${k}<br><span style="font-size:.5rem;opacity:.5">${statDescs[k]}</span></div>
+          <div class="smc-val">${stats[k]??'?'}</div>
+          <div class="smc-mod">${v ? modStr : "—"}</div>
+        </div>`;
+      }).join("");
+
+      const hpPct = Math.max(0,Math.min(100,((p.hp??p.maxHp)/(p.maxHp||40))*100));
+      const mpPct = Math.max(0,Math.min(100,((p.mp??p.maxMp)/(p.maxMp||10))*100));
+      const hpCls = hpPct>60?"var(--hp-high)":hpPct>30?"var(--hp-mid)":"var(--hp-low)";
+      document.getElementById("smd-bars").innerHTML = `
+        <div class="smb-row">
+          <span class="smb-label">HP</span>
+          <div class="smb-track"><div class="smb-fill" style="width:${hpPct}%;background:${hpCls}"></div></div>
+          <span class="smb-nums">${p.hp??p.maxHp} / ${p.maxHp}</span>
+        </div>
+        <div class="smb-row">
+          <span class="smb-label">MP</span>
+          <div class="smb-track"><div class="smb-fill" style="width:${mpPct}%;background:var(--mp-col)"></div></div>
+          <span class="smb-nums">${p.mp??p.maxMp} / ${p.maxMp}</span>
+        </div>`;
+
+      const statuses = p.statuses || [];
+      document.getElementById("smd-statuses").innerHTML = statuses.length
+        ? statuses.map(s => `<span class="pill pill-${s}">${s}</span>`).join("")
+        : `<span style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--sys-text-faint);letter-spacing:.1em">NO ACTIVE CONDITIONS</span>`;
+
+      document.getElementById("stat-modal-overlay").classList.add("open");
+    };
+
+    window.closeStatModal = function(e) {
+      if (e.target === document.getElementById("stat-modal-overlay")) {
+        document.getElementById("stat-modal-overlay").classList.remove("open");
+      }
+    };
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") document.getElementById("stat-modal-overlay").classList.remove("open");
+    });
+
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
         update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
@@ -952,5 +1127,18 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       setTimeout(()=>t.classList.remove("show"),2500);
     }
   </script>
+
+  <!-- Stat card modal -->
+  <div class="stat-modal-overlay" id="stat-modal-overlay" onclick="closeStatModal(event)">
+    <div class="stat-modal" id="stat-modal">
+      <button class="stat-modal-close" onclick="document.getElementById('stat-modal-overlay').classList.remove('open')">[ CLOSE ]</button>
+      <div class="stat-modal-name" id="smd-name"></div>
+      <div class="stat-modal-class" id="smd-class"></div>
+      <div class="stat-modal-grid" id="smd-grid"></div>
+      <div class="stat-modal-bars" id="smd-bars"></div>
+      <div class="stat-modal-statuses" id="smd-statuses"></div>
+    </div>
+  </div>
+
 </body>
 </html>
