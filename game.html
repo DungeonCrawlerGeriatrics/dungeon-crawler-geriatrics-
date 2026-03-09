@@ -392,6 +392,26 @@
       padding-top: 0.4rem;
     }
 </style>
+<style>
+    .roll-call {
+      display: inline-block;
+      margin: 0.3rem 0;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--sys-gold);
+      background: rgba(255,204,68,0.06);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--sys-gold);
+      letter-spacing: 0.08em;
+      animation: roll-pulse 1.5s ease-in-out infinite;
+      cursor: pointer;
+    }
+    @keyframes roll-pulse {
+      0%,100% { box-shadow: 0 0 6px rgba(255,204,68,0.2); }
+      50%      { box-shadow: 0 0 16px rgba(255,204,68,0.5); }
+    }
+    .roll-call:hover { background: rgba(255,204,68,0.12); }
+</style>
 </head>
 <body class="game-page">
 
@@ -791,9 +811,13 @@
 
     function formatDM(text) {
       return text
+        .replace(/\[ROLL:\s*([^\]]+)\]/g, (_, inner) =>
+          `<span class="roll-call" onclick="document.querySelector('.dice-fab').click()" title="Open dice tray">🎲 ROLL REQUIRED: ${inner.trim()}</span>`)
         .replace(/\[SYSTEM:[^\]]+\]/g, m => `<span class="mech">${m}</span>`)
         .replace(/\[([^\]]+)\]/g, m => `<span class="mech">${m}</span>`)
         .replace(/\{LOOT:[^}]+\}/g, m => `<span class="loot">${m.replace(/\{LOOT:/,"").replace(/\}/,"")}</span>`)
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
         .replace(/\n/g,"<br>");
     }
 
@@ -1083,6 +1107,29 @@ MECHANICS:
 - NEVER write "You could..." or "Perhaps..." or "There are three paths..."
 - DO NOT hint at what players might want to do next. They know their characters. Trust them.
 - You are a narrator, not a game show host. Paint the world. Shut up. Wait.
+
+DICE & OUTCOMES:
+Players have a physical dice tray. When an action has uncertain, risky, or dramatic outcomes, DEMAND a roll before narrating the result. Do not auto-resolve things that should be decided by dice.
+
+Call for rolls like this:
+  [ROLL: d20+STR — to force the rusted door]
+  [ROLL: d20+DEX — to dodge the falling debris]
+  [ROLL: d20+CHA — to convince the goblin you're his supervisor]
+  [ROLL: d20+INT — to recall dungeon architecture]
+  [ROLL: d20 — pure luck, no stat applies]
+
+When you call for a roll, STOP. Do not narrate what happens yet. Wait for the player to post their result.
+When the player posts a number, narrate based on that number:
+  1        = catastrophic failure, something goes hilariously/horribly wrong
+  2-5      = failure with consequences
+  6-10     = failure, but nothing makes it worse
+  11-15    = partial success, something costs them
+  16-19    = clean success
+  20+      = exceptional success, something extra good happens
+  Nat 20   = legendary moment, go big
+  Nat 1    = spectacular disaster, go big in the worst way
+
+NOT every action needs a roll. Don't roll for: looking around, talking normally, walking somewhere safe, picking up an item. DO roll for: combat, risky movement, persuasion of hostile NPCs, anything that could meaningfully fail.
 - Pets CAN be found and adopted — make this special.
 - The dungeon has 5 levels. Final boss has back problems too.`;
     }
@@ -1542,6 +1589,20 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
         }
       }
     };
+
+
+    function parseDMText(text) {
+      if (!text) return text;
+      text = text.replace(/\[ROLL:\s*([^\]]+)\]/g, function(_, inner) {
+        return '<span class="roll-call" onclick="document.querySelector(\'.dice-fab\').click()" title="Open dice tray">🎲 ROLL: ' + inner.trim() + '</span>';
+      });
+      text = text.replace(/\[SYSTEM:\s*([^\]]+)\]/g, function(_, inner) {
+        return '<span class="sys-notif">[SYSTEM: ' + inner.trim() + ']</span>';
+      });
+      text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      return text;
+    }
 
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
