@@ -776,8 +776,20 @@
     // ── State ───────────────────────────────────────────────
     const params   = new URLSearchParams(window.location.search);
     const roomCode = params.get("room");
-    const me       = JSON.parse(sessionStorage.getItem("dcg_player")||"null");
+    // Try sessionStorage first, fall back to localStorage for same-device rejoin
+    let me = JSON.parse(sessionStorage.getItem("dcg_player")||"null");
+    if (!me && roomCode) {
+      const saved = localStorage.getItem(`dcg_session_${roomCode}`);
+      if (saved) { try { me = JSON.parse(saved); } catch(e){} }
+    }
     if (!roomCode||!me) { window.location.href="index.html"; }
+
+    // Persist session to localStorage so browser-close doesn't lose it
+    if (me && roomCode) {
+      localStorage.setItem(`dcg_session_${roomCode}`, JSON.stringify({...me, roomCode}));
+      localStorage.setItem('dcg_last_room', roomCode);
+      sessionStorage.setItem("dcg_player", JSON.stringify(me)); // keep sessionStorage in sync
+    }
 
     let roomData     = null;
     let players      = [];
@@ -792,8 +804,27 @@
 
     document.getElementById("gh-room-code").textContent = roomCode;
 
-    // Mark online
-    update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:true});
+    // Mark online — and announce rejoin if player was paused
+    const wasOffline = async () => {
+      const snap = await get(ref(db, `rooms/${roomCode}/players/${me.id}`));
+      if (snap.exists() && snap.val().paused) {
+        const RETURN_SCENES = [
+          `materialized out of a crack in the wall, looking only slightly translucent`,
+          `stepped out of a dimensional rift that smelled faintly of whatever they were doing`,
+          `simply reappeared, offering no explanation. The System has updated their record.`,
+          `fell from the ceiling, landed fine, said nothing`,
+          `walked in from a door that wasn't there a moment ago and won't be there again`,
+          `condensed back into existence like a strong opinion nobody asked for`,
+        ];
+        const scene = RETURN_SCENES[Math.floor(Math.random() * RETURN_SCENES.length)];
+        await update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true, paused: false });
+        await writeGroupLog({type:'sys', sclass:'green',
+          text:`SYSTEM: ${snap.val().name} has ${scene}.`});
+      } else {
+        await update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true });
+      }
+    };
+    wasOffline();
 
     // ── Firebase listener ───────────────────────────────────
     onValue(ref(db,`rooms/${roomCode}`), snap => {
@@ -2376,68 +2407,94 @@ Keep response under 80 words. Short. Conspiratorial.`;
     };
 
     window.leaveGame = async function(){
-      if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
-        // If it's this player's turn, advance to next online player first
+      if(confirm("PAUSE SESSION? Your character will dramatically exit until you return.")){
+        const DEATH_SCENES = [
+          `stepped on their own shoelace and fell into a dimensional rift`,
+          `walked into a wall that wasn't there a second ago and phased through it`,
+          `got a phone notification so urgent they simply ceased to exist`,
+          `tripped over the couch they brought with them and vanished into the floor`,
+          `accidentally accepted a Terms & Conditions popup and was claimed by the System`,
+          `sneezed at the wrong moment and folded themselves into a pocket dimension`,
+          `said "I'll be right back" with the confidence of someone who won't be right back`,
+          `got distracted by a vending machine and wandered into a wall`,
+          `attempted to take a shortcut and found out what shortcuts actually lead to`,
+          `simply sat down and refused to participate, which the dungeon interpreted as an exit`
+        ];
+        const scene = DEATH_SCENES[Math.floor(Math.random() * DEATH_SCENES.length)];
+        const name = myPlayer?.name || 'A survivor';
+
+        // Advance turn if it's this player's turn
         if(players[turnIndex]?.id === me.id) {
-          const onlinePlayers = players.filter(p => p.online && p.id !== me.id);
-          if (onlinePlayers.length > 0) {
-            let next = (turnIndex + 1) % players.length;
-            // Skip offline players
-            let attempts = 0;
-            while (players[next]?.id === me.id && attempts < players.length) {
-              next = (next + 1) % players.length;
-              attempts++;
-            }
-            await update(ref(db, `rooms/${roomCode}`), { turnIndex: next });
+          let next = (turnIndex + 1) % players.length;
+          let attempts = 0;
+          while ((players[next]?.id === me.id || (players[next]?.hp??1) <= 0) && attempts < players.length) {
+            next = (next + 1) % players.length; attempts++;
           }
+          await update(ref(db, `rooms/${roomCode}`), { turnIndex: next });
         }
-        await update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false, hp:0});
-        await writeGroupLog({type:'sys', sclass:'', text:`SYSTEM: ${myPlayer?.name||'A player'} has disconnected. They tripped into a pit.`});
+
+        // Mark paused — NOT dead, just offline. canRejoin flag for session restore
+        await update(ref(db, `rooms/${roomCode}/players/${me.id}`), {
+          online: false,
+          paused: true,   // different from dead — can rejoin
+          hp: Math.max(1, myPlayer?.hp ?? 1) // keep HP, don't zero it
+        });
+
+        await writeGroupLog({type:'sys', sclass:'error',
+          text:`SYSTEM: ${name} has ${scene}. Their essence lingers. They may yet return.`});
+
+        // Save session to localStorage for rejoin
+        localStorage.setItem(`dcg_session_${roomCode}`, JSON.stringify({
+          id: me.id, name: me.name, isHost: me.isHost, roomCode
+        }));
+        localStorage.setItem('dcg_last_room', roomCode);
+
         sessionStorage.removeItem("dcg_player");
-        window.location.href="index.html";
+        window.location.href = "index.html";
       }
     };
 
     // ── Mobile tab navigation ─────────────────────────────────
-    let currentMobileTab = 'group'; // default to group log on mobile
+    let currentMobileTab = 'group';
 
     function isMobile() { return window.innerWidth <= 768; }
 
     function initMobileNav() {
       if (!isMobile()) return;
       document.getElementById('mobile-nav').style.display = 'flex';
-      mobileTab('group'); // start on group log
+      mobileTab('group');
     }
 
     window.mobileTab = function(tab) {
       if (!isMobile()) return;
       currentMobileTab = tab;
 
-      // Update all panels
-      document.getElementById('panel-left').classList.toggle('mobile-active',  tab === 'party');
-      document.querySelector('.panel-center').classList.toggle('mobile-active', tab === 'group');
-      document.getElementById('panel-right')?.classList.toggle('mobile-active', tab === 'private');
+      const panelLeft   = document.getElementById('panel-left');
+      const panelCenter = document.querySelector('.panel-center');
+      const panelRight  = document.getElementById('panel-right') || document.querySelector('.panel-right');
+      const inputZone   = document.querySelector('.input-zone');
+      const privInput   = document.querySelector('.private-input-zone');
 
-      // Show/hide private input zone
-      const privInput = document.querySelector('.private-input-zone');
-      if (privInput) privInput.style.display = tab === 'private' ? 'block' : 'none';
+      // Toggle panel visibility
+      panelLeft?.classList.toggle('mobile-active',  tab === 'party');
+      panelCenter?.classList.toggle('mobile-active', tab === 'group');
+      panelRight?.classList.toggle('mobile-active',  tab === 'private');
 
-      // Show/hide group input zone
-      const inputZone = document.querySelector('.input-zone');
-      if (inputZone) inputZone.style.display = tab === 'group' ? 'block' : 'none';
+      // Show/hide fixed input zones
+      if (inputZone) inputZone.classList.toggle('mobile-hidden', tab !== 'group');
+      if (privInput) privInput.classList.toggle('mobile-visible', tab === 'private');
 
-      // Update nav button states
-      document.querySelectorAll('.mobile-nav-btn').forEach(b => {
-        b.classList.remove('active', 'active-priv');
-      });
-      const btn = document.getElementById(`mnav-${tab === 'party' ? 'party' : tab === 'group' ? 'group' : 'private'}`);
+      // Update nav buttons
+      document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active','active-priv'));
+      const btnMap = { party:'mnav-party', group:'mnav-group', private:'mnav-private' };
+      const btn = document.getElementById(btnMap[tab]);
       if (btn) btn.classList.add(tab === 'private' ? 'active-priv' : 'active');
 
-      // Clear unread dot for this tab
-      const dot = document.getElementById(`mnav-unread-${tab === 'party' ? 'party' : tab === 'group' ? 'group' : 'private'}`);
-      if (dot) dot.classList.remove('visible');
+      // Clear unread dot
+      const dotMap = { party:'mnav-unread-party', group:'mnav-unread-group', private:'mnav-unread-private' };
+      document.getElementById(dotMap[tab])?.classList.remove('visible');
 
-      // Scroll log to bottom when switching to group
+      // Scroll to bottom on group tab
       if (tab === 'group') {
         setTimeout(() => {
           const log = document.getElementById('group-log');
@@ -2446,16 +2503,13 @@ Keep response under 80 words. Short. Conspiratorial.`;
       }
     };
 
-    // Mark unread on mobile nav when new messages arrive on inactive tab
     function mobileMarkUnread(tab) {
-      if (!isMobile()) return;
-      if (currentMobileTab === tab) return; // already viewing this tab
-      const navTab = tab === 'dm' || tab === 'private' ? 'private' : tab;
-      const dot = document.getElementById(`mnav-unread-${navTab}`);
-      if (dot) dot.classList.add('visible');
+      if (!isMobile() || currentMobileTab === tab) return;
+      const dotMap = { group:'mnav-unread-group', private:'mnav-unread-private', party:'mnav-unread-party' };
+      const navTab = (tab === 'dm' || tab === 'private') ? 'private' : tab;
+      document.getElementById(dotMap[navTab])?.classList.add('visible');
     }
 
-    // Init on load + handle resize
     window.addEventListener('load', initMobileNav);
     window.addEventListener('resize', () => {
       if (isMobile()) {
@@ -2463,14 +2517,11 @@ Keep response under 80 words. Short. Conspiratorial.`;
         mobileTab(currentMobileTab);
       } else {
         document.getElementById('mobile-nav').style.display = 'none';
-        // Restore desktop — show all panels
-        document.getElementById('panel-left').classList.remove('mobile-active');
-        document.querySelector('.panel-center').classList.remove('mobile-active');
-        document.getElementById('panel-right')?.classList.remove('mobile-active');
-        const inputZone = document.querySelector('.input-zone');
-        if (inputZone) inputZone.style.display = '';
-        const privInput = document.querySelector('.private-input-zone');
-        if (privInput) privInput.style.display = '';
+        // Restore desktop — all panels visible, inputs static
+        ['panel-left','panel-right'].forEach(id => document.getElementById(id)?.classList.remove('mobile-active'));
+        document.querySelector('.panel-center')?.classList.remove('mobile-active');
+        document.querySelector('.input-zone')?.classList.remove('mobile-hidden');
+        document.querySelector('.private-input-zone')?.classList.remove('mobile-visible');
       }
     });
 

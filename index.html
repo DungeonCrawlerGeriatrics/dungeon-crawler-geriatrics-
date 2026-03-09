@@ -26,6 +26,20 @@
 
     <div class="lobby-card">
 
+      <!-- CONTINUE SESSION — shown only if localStorage has a valid session -->
+      <section class="lobby-section" id="continue-section" style="display:none;border:1px solid var(--sys-gold);background:rgba(255,204,68,0.04);padding:1rem;">
+        <div class="section-title" style="color:var(--sys-gold)">// RESUME INSTANCE</div>
+        <p class="section-desc" id="continue-desc">Your last session is still active.</p>
+        <button class="btn btn-gold btn-block" id="btn-continue" onclick="continueSession()">
+          [ RETURN TO DUNGEON ]
+        </button>
+        <button onclick="dismissContinue()" style="background:none;border:none;color:var(--sys-text-faint);font-family:'Share Tech Mono',monospace;font-size:0.6rem;letter-spacing:.1em;cursor:pointer;margin-top:.5rem;width:100%;text-align:center;">
+          [ FORGET THIS SESSION ]
+        </button>
+      </section>
+
+      <div id="continue-or" class="lobby-or" style="display:none">// OR //</div>
+
       <!-- CREATE -->
       <section class="lobby-section">
         <div class="section-title">// INITIALIZE NEW INSTANCE</div>
@@ -133,6 +147,8 @@
           log: {}
         });
         sessionStorage.setItem("dcg_player", JSON.stringify({id:playerId, name, roomCode, isHost:true}));
+        localStorage.setItem(`dcg_session_${roomCode}`, JSON.stringify({id:playerId, name, roomCode, isHost:true}));
+        localStorage.setItem('dcg_last_room', roomCode);
         window.location.href = `quiz.html?room=${roomCode}`;
       } catch(e) {
         console.error(e);
@@ -168,6 +184,8 @@
           privateHistory: "[]"
         });
         sessionStorage.setItem("dcg_player", JSON.stringify({id:playerId, name, roomCode:code, isHost:false}));
+        localStorage.setItem(`dcg_session_${code}`, JSON.stringify({id:playerId, name, roomCode:code, isHost:false}));
+        localStorage.setItem('dcg_last_room', code);
         window.location.href = `quiz.html?room=${code}`;
       } catch(e) {
         console.error(e);
@@ -175,6 +193,81 @@
         btn.disabled=false; btn.textContent="[ ENTER DUNGEON ]";
       }
     };
+
+    // ── Session restore ─────────────────────────────────────
+    async function checkForExistingSession() {
+      const lastRoom = localStorage.getItem('dcg_last_room');
+      if (!lastRoom) return;
+      const saved = localStorage.getItem(`dcg_session_${lastRoom}`);
+      if (!saved) return;
+      let session;
+      try { session = JSON.parse(saved); } catch(e) { return; }
+
+      // Validate: room still exists and is playing
+      try {
+        const snap = await get(ref(db, `rooms/${lastRoom}`));
+        if (!snap.exists()) { clearSession(lastRoom); return; }
+        const room = snap.val();
+        if (room.status !== 'playing') { clearSession(lastRoom); return; }
+        // Check player still exists in room
+        const player = room.players?.[session.id];
+        if (!player) { clearSession(lastRoom); return; }
+
+        // Show the continue section
+        const playerName = player.name || session.name;
+        const hp = player.hp ?? player.maxHp ?? 40;
+        const cls = player.heroClass ? ` [${player.heroClass.toUpperCase()}]` : '';
+        document.getElementById('continue-desc').textContent =
+          `${playerName}${cls} · HP ${hp} · Room ${lastRoom} · The dungeon remembers you.`;
+        document.getElementById('continue-section').style.display = 'block';
+        document.getElementById('continue-or').style.display = 'block';
+
+        // Store validated session for continueSession()
+        window._pendingContinue = { session, room, player, roomCode: lastRoom };
+      } catch(e) { console.error('Session check failed', e); }
+    }
+
+    window.continueSession = function() {
+      const c = window._pendingContinue;
+      if (!c) return;
+      // Restore session — use stored player ID so we rejoin as same character
+      const me = { id: c.session.id, name: c.player.name || c.session.name, roomCode: c.roomCode, isHost: c.session.isHost };
+      sessionStorage.setItem("dcg_player", JSON.stringify(me));
+      // If player was paused/ragequit, restore them
+      if (c.player.paused) {
+        const { update: fbUpdate, ref: fbRef, getDatabase: fbGetDB, initializeApp: fbInit } = window._fbModules || {};
+        // Use already-imported Firebase
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js").then(({getDatabase, ref, update}) => {
+          const db2 = getDatabase();
+          update(ref(db2, `rooms/${c.roomCode}/players/${me.id}`), {
+            online: true, paused: false,
+            hp: Math.max(c.player.hp ?? 1, 1) // restore with at least 1 HP
+          }).then(() => {
+            window.location.href = `game.html?room=${c.roomCode}`;
+          });
+        });
+      } else {
+        window.location.href = `game.html?room=${c.roomCode}`;
+      }
+    };
+
+    window.dismissContinue = function() {
+      const lastRoom = localStorage.getItem('dcg_last_room');
+      if (lastRoom) clearSession(lastRoom);
+      document.getElementById('continue-section').style.display = 'none';
+      document.getElementById('continue-or').style.display = 'none';
+    };
+
+    function clearSession(roomCode) {
+      localStorage.removeItem(`dcg_session_${roomCode}`);
+      localStorage.removeItem('dcg_last_room');
+    }
+
+    // Also save session to localStorage when joining/creating
+    const _origJoin = window.joinRoom;
+
+    // Run on load
+    checkForExistingSession();
 
     // Generate hilariously bad stats (2d4 method — you're just a person)
     function genStats() {
