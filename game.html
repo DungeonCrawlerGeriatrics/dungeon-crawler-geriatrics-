@@ -821,6 +821,9 @@
       if (document.getElementById('pm-channel-notes').style.display !== 'none') initNotes();
       syncGroupLog(roomData.log||{});
 
+      // Load storyLedger
+      if (roomData.storyLedger) storyLedger = roomData.storyLedger;
+
       // Load private history from my player data
       syncPrivateLog(myPlayer?.privateLog||{});
 
@@ -962,8 +965,9 @@
 
     function formatDM(text) {
       return text
-        // Strip TRANSFER tags entirely from display — they're mechanical only
+        // Strip mechanical-only tags from display
         .replace(/\{TRANSFER:[^}]+\}/g, '')
+        .replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '')
         // Strip LOOT tags but show a pretty inventory pill
         .replace(/\{LOOT:\s*([^—–}-]+)[—–-]?([^}]*)\}/g, (_, name, desc) => {
           const n = name.trim();
@@ -1068,24 +1072,28 @@
       const seed  = SEEDS[Math.floor(Math.random()  * SEEDS.length)];
       const entry = ENTRIES[Math.floor(Math.random() * ENTRIES.length)];
 
-      const openMsg = `DUNGEON INSTANCE INITIALIZED.
+      const encodedState = encodeGameState();
 
-Party:
-${party}
+      const openMsg = `#STATE
+${encodedState}
 
-${backstories ? `CHARACTER BACKSTORIES — read these. Use them. Reference specific details directly in the opening:\n${backstories}\n` : ''}
+#LEDGER
+∅ (instance just initialized)
+
+DUNGEON INSTANCE INITIALIZED. This is the opening scene.
+
 Pre-dungeon moment: ${seed}
 Transition type: ${entry}
 
-OPENING SCENE RULES — follow these exactly:
-- Reference at least ONE specific detail from someone's actual backstory in the opening — make them feel seen and roasted
-- The physical transition must feel specific and wrong in the way described above — do NOT default to fog, silence, or mildew smell
-- Give each person ONE absurd mundane object that came with them — make it specific to who they are
-- The [SYSTEM: WELCOME] notification should be snarky and slightly different from a standard corporate message
-- Do NOT describe their emotional state — just the world going wrong around them
-- End mid-moment before anyone has processed what's happening
-- Do NOT offer choices. Do NOT ask what they do. Paint the scene and stop.`;
-
+OPENING SCENE RULES:
+- Reference at least ONE specific detail from a player's BS: (backstory) field — make them feel seen and roasted
+- Physical transition must match the type described above — no generic fog or mildew
+- Give each person ONE absurd mundane object that came with them (tag it: {LOOT: item — desc})
+- [SYSTEM: WELCOME] notification should be snarky and specific to this group
+- Do NOT describe emotional states — just the world going wrong
+- End mid-moment before anyone has processed what happened
+- Do NOT offer choices. Do NOT ask what they do. Paint the scene and stop.
+- End with [LEDGER_UPDATE: LOC:Entry_Chamber|PLOT:group_just_arrived|MOOD:chaos_and_confusion]`;
 
       const dmText = await callClaude(buildSysPrompt(), openMsg, []);
       aiHistory = [{role:"user",content:openMsg},{role:"assistant",content:dmText}];
@@ -1095,9 +1103,11 @@ OPENING SCENE RULES — follow these exactly:
       await postSystemNotifs(dmText);
       parseLootFromDM(dmText);
       await parseTransfers(dmText);
-      await writeGroupLog({type:"dm",text:dmText});
+      parseLedgerUpdate(dmText);
 
-      // Check if DM called for a roll — set pending if this player's turn
+      const displayText = dmText.replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '').trim();
+      await writeGroupLog({type:"dm", text:displayText});
+
       checkForPendingRoll(dmText);
 
       isDMThinking=false; setTyping(false); renderTurnBar();
@@ -1116,47 +1126,34 @@ OPENING SCENE RULES — follow these exactly:
       // Log player action publicly
       await writeGroupLog({type:"player",pid:me.id,pname:myPlayer?.name||me.name,emoji:myPlayer?.heroEmoji||"?",text});
 
-      // Load latest AI history — trim to last 12 exchanges to prevent context bloat
+      // Load latest AI history — trim to last 8 exchanges (16 msgs) to prevent bloat
       const snap = await get(ref(db,`rooms/${roomCode}/aiHistory`));
       if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
-      if (aiHistory.length > 24) aiHistory = aiHistory.slice(-24); // keep last 12 exchanges
+      if (aiHistory.length > 16) aiHistory = aiHistory.slice(-16);
 
-      // Build a live game state summary injected at the TOP of every message
-      // This is the DM's "cheat sheet" — what has been decided, what exists, what happened
-      const assignedClasses = players.filter(p=>p.heroClass).map(p=>`${p.name}=${p.heroClass}`).join(", ") || "none yet";
-      const allInventories  = players.map(p=>{
-        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ")||"empty";
-        return `${p.name}: [${inv}]`;
-      }).join(" | ");
-      const allSkills = players.map(p=>{
-        const sk = Object.values(p.skills||{}).map(s=>s.name).join(", ")||"none";
-        return `${p.name}: ${sk}`;
-      }).join(" | ");
-      const gameStateSummary = `=== LIVE GAME STATE (authoritative) ===
-Location: ${roomData?.location||"Entry Chamber"} | Depth: ${depth}/5 | Turn: ${turnCount+1} | Round: ${roundCount}
-Classes assigned: ${assignedClasses}
-Inventories: ${allInventories}
-Skills: ${allSkills}
-HP: ${players.map(p=>`${p.name}:${p.hp??p.maxHp}/${p.maxHp}`).join(", ")}
-======================================`;
-
-      const actor  = players[turnIndex];
-      const actorInv = Object.values(actor?.inventory||{}).map(i=>`"${i.name}"`).join(", ") || "nothing";
+      const actor     = players[turnIndex];
+      const actorInv  = Object.values(actor?.inventory||{}).map(i=>`"${i.name}"`).join(", ") || "nothing";
       const actorSkills = Object.values(actor?.skills||{}).map(s=>s.name).join(", ") || "none";
-      const pStatus = players.map(p => {
-        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
+      const pStatus   = players.map(p => {
+        const inv    = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
         const fallen = (p.hp??1)<=0 ? " [FALLEN]" : "";
         return `${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${fallen} Class:${p.heroClass||"???"}`;
       }).join(" | ");
-      const msg = `${gameStateSummary}
-[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]
-ACTING PLAYER: ${actor?.name} (HP:${actor?.hp??actor?.maxHp}/${actor?.maxHp} | Class:${actor?.heroClass||"UNASSIGNED"})
-  Inventory: [${actorInv}]
-  Skills: ${actorSkills}
-  Action: "${text}"
-Party status: ${pStatus}
 
-Narrate the result. {LOOT: name — desc} for new items. {TRANSFER: name — from:X to:Y} to move items. If this action strongly reveals a class, NOW use [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!] — only use this tag when assigning, never mention a class without it.`;
+      // Encode full game state into compact stenotype block
+      const encodedState = encodeGameState();
+      const ledger = storyLedger || buildLedgerFromHistory();
+
+      const msg = `#STATE
+${encodedState}
+
+#LEDGER
+${ledger || "∅ (game just started)"}
+
+#ACTION
+${actor?.name} (${actor?.heroClass||"UNASSIGNED"}) acts: "${text}"
+
+Narrate result. End with [LEDGER_UPDATE: updated_ledger] — update your memory with what just happened. {LOOT: name — desc} for items. {TRANSFER: name — from:X to:Y} to move items. Use [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] only when assigning.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
@@ -1167,7 +1164,11 @@ Narrate the result. {LOOT: name — desc} for new items. {TRANSFER: name — fro
       await postSystemNotifs(dmText);
       parseLootFromDM(dmText);
       await parseTransfers(dmText);
-      await writeGroupLog({type:"dm",text:dmText});
+      parseLedgerUpdate(dmText); // extract and save AI's story memory
+
+      // Strip [LEDGER_UPDATE:...] from displayed text
+      const displayText = dmText.replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '').trim();
+      await writeGroupLog({type:"dm", text:displayText});
 
       // Check if DM called for a roll before advancing turn
       const hasRoll = checkForPendingRoll(dmText);
@@ -1315,7 +1316,10 @@ Narrate the result. {LOOT: name — desc} for new items. {TRANSFER: name — fro
         }
 
         // Strip [public:] tags and double-write bug — write ONCE
-        const privateText = dmText.replace(/\[public:\s*[^\]]+\]/gi, '').trim();
+        const privateText = dmText
+          .replace(/\[public:\s*[^\]]+\]/gi, '')
+          .replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '')
+          .trim();
         await writePrivateLog({from:"dm", text: privateText || dmText});
 
       } catch(e) {
@@ -1451,88 +1455,143 @@ Narrate the result. {LOOT: name — desc} for new items. {TRANSFER: name — fro
       }
     }
 
+    // ── State Encoder (stenotype compression) ───────────────
+    // Encodes full game state into compact notation the AI can read efficiently.
+    // Schema defined ONCE in system prompt — every message sends raw encoded state.
+    // Format: @Name|CLASS|HPcur/max|MPcur/max|STRv±m,DEXv±m,...|ST:status
+    //   INV:itemName~desc,itemName~desc
+    //   SK:skillName~desc
+    //   NT:private_notes_for_DM (spaces→underscores)
+    //   LEDGER:compressed_story_log
+
+    function encodeStats(stats) {
+      const order = ["STR","DEX","CON","INT","WIS","CHA"];
+      return order.map(k => {
+        const v = parseInt(stats?.[k]) || 0;
+        const m = Math.floor((v-10)/2);
+        return `${k}${v}${m>=0?'+'+m:m}`;
+      }).join(",");
+    }
+
+    function encodeInv(inventory) {
+      const items = Object.values(inventory||{});
+      if (!items.length) return "∅";
+      return items.map(i => {
+        const name = i.name.replace(/[,~|\n]/g, '_');
+        const desc = (i.desc||"").slice(0,40).replace(/[,~|\n]/g,'_');
+        return desc ? `${name}~${desc}` : name;
+      }).join(",");
+    }
+
+    function encodeSkills(skills) {
+      const sk = Object.values(skills||{});
+      if (!sk.length) return "∅";
+      return sk.map(s => {
+        const name = s.name.replace(/[,~|\n]/g,'_');
+        const desc = (s.desc||"").slice(0,30).replace(/[,~|\n]/g,'_');
+        return desc ? `${name}~${desc}` : name;
+      }).join(",");
+    }
+
+    function encodePlayer(p) {
+      const hp   = `${p.hp??p.maxHp}/${p.maxHp}`;
+      const mp   = `${p.mp??p.maxMp??0}/${p.maxMp??0}`;
+      const cls  = p.heroClass || "???";
+      const st   = (p.statuses||[]).length ? `|ST:${p.statuses.join("+")}` : "";
+      const inv  = encodeInv(p.inventory);
+      const sk   = encodeSkills(p.skills);
+      const nt   = p.notes ? `\n  NT:${p.notes.slice(0,80).replace(/[\n|]/g,'_')}` : "";
+      const bs   = p.backstory ? `\n  BS:${p.backstory.slice(0,120).replace(/[\n|]/g,'_')}` : "";
+      return `@${p.name}|${cls}|HP${hp}|MP${mp}|${encodeStats(p.stats)}${st}\n  INV:${inv}\n  SK:${sk}${nt}${bs}`;
+    }
+
+    function encodeGameState() {
+      const loc   = (roomData?.location||"Entry_Chamber").replace(/\s+/g,'_');
+      const header = `#T${turnCount+1}R${roundCount}D${depth} LOC:${loc} ACT:${players[turnIndex]?.name||"?"}`;
+      const party  = players.map(encodePlayer).join("\n");
+      return `${header}\n${party}`;
+    }
+
+    // Story ledger — compressed narrative maintained by AI across turns
+    // Stored in Firebase as roomData.storyLedger
+    // AI is instructed to update it each turn via [LEDGER_UPDATE: ...] tag
+    let storyLedger = "";
+
+    function buildLedgerFromHistory() {
+      // Fallback: build basic ledger from log entries if no AI-maintained one exists
+      if (storyLedger) return storyLedger;
+      const log = Object.values(roomData?.log||{})
+        .sort((a,b)=>(a.ts||0)-(b.ts||0))
+        .filter(e => e.type==="dm" || e.type==="player" || e.type==="sys")
+        .slice(-15)
+        .map(e => {
+          if (e.type==="sys") return `SYS:${e.text?.slice(0,60)}`;
+          if (e.type==="player") return `${e.playerName}:"${e.text?.slice(0,50)}"`;
+          return `DM:${e.text?.slice(0,80).replace(/\n/g,' ')}`;
+        }).join("|");
+      return log || "∅";
+    }
+
+    function parseLedgerUpdate(dmText) {
+      const m = dmText.match(/\[LEDGER_UPDATE:\s*([^\]]+)\]/i);
+      if (m) {
+        storyLedger = m[1].trim();
+        // Save to Firebase
+        update(ref(db, `rooms/${roomCode}`), { storyLedger });
+      }
+    }
+
     // ── System prompts ───────────────────────────────────────
+    // System prompt sent ONCE per session — contains schema decoder + rules only.
+    // Live state is encoded fresh every turn in the user message instead.
     function buildSysPrompt() {
-      const partyDesc = players.map(p => {
-        const s       = p.stats || {};
-        const statStr = Object.entries(s).map(([k,v]) => {
-          const mod = Math.floor((parseInt(v)-10)/2);
-          return `${k}:${v}(${mod>=0?'+'+mod:mod})`;
-        }).join(" ");
-        const inv     = Object.values(p.inventory||{});
-        const invList = inv.length
-          ? inv.map(i => `"${i.name}"${i.desc ? ` — ${i.desc}` : ''}`).join("; ")
-          : "empty";
-        const skills  = Object.values(p.skills||{});
-        const skillStr = skills.length
-          ? skills.map(s => `${s.name}${s.desc ? ` (${s.desc})` : ''}`).join("; ")
-          : "none";
-        const statuses = (p.statuses||[]).length ? `Conditions: ${p.statuses.join(", ")}` : "";
-        const notes    = p.notes ? `Private notes (DM eyes only): "${p.notes}"` : "";
-        const backstory = p.backstory ? `Backstory: ${p.backstory.slice(0,400)}` : "";
-        const quizAnswers = p.quizAnswers ? `Quiz answers: ${p.quizAnswers.slice(0,300)}` : "";
-        return [
-          `[ ${p.heroEmoji||"?"} ${p.name}${p.heroName ? ` aka "${p.heroName}"` : ""} ]`,
-          `  Class: ${p.heroClass||"UNASSIGNED"} | HP: ${p.hp??p.maxHp}/${p.maxHp} | MP: ${p.mp??p.maxMp??0}/${p.maxMp??0}`,
-          `  Stats: ${statStr||"unknown"}`,
-          `  Inventory: [${invList}]`,
-          `  Skills: ${skillStr}`,
-          statuses,
-          notes,
-          backstory,
-          quizAnswers
-        ].filter(Boolean).join("\n");
-      }).join("\n\n");
-      return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
+      return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler. Dungeon Crawler Carl vibes: dark fantasy + middle-aged mundane humor. The System activated mid-evening, pulling friends from their couch into a dungeon. Nobody consented.
 
-LORE: A mysterious System activated mid-evening without warning, pulling a group of friends from their living room into a dungeon. Nobody consented. The System is watching everything and assigns classes based on behavior — players don't choose their class, they EARN it through actions.
+== ENCODED STATE SCHEMA (read each turn's #STATE block using this) ==
+#TnRnDn        = Turn, Round, Depth
+LOC:x          = current location (underscores=spaces)
+ACT:name       = whose turn it is
+@Name|CLS|HPc/m|MPc/m|STRv±m,DEXv±m,CONv±m,INTv±m,WISv±m,CHAv±m
+  INV:item~desc,item~desc   (∅ = empty)
+  SK:skill~desc             (∅ = none)
+  NT:private_notes          (DM eyes only — never reveal to other players)
+  BS:backstory_summary      (use for flavor and callbacks)
+  ST:condition+condition    (active status effects)
+== END SCHEMA ==
 
-CURRENT STATE:
-Location: ${roomData?.location||"Entry Chamber"} | Depth: ${depth}/5 | Turn: ${turnCount+1} | Round: ${roundCount}
-Active player this turn: ${players[turnIndex]?.name||"unknown"}
+== STORY LEDGER SCHEMA ==
+Each turn, after narrating, you MUST append to the story ledger using:
+[LEDGER_UPDATE: compressed_ledger]
+Ledger format (keep total under 400 chars):
+  KEY:value|KEY:value|...
+Keys: LOC(location),CLZ(classes assigned),PLOT(active threads),ITEM(notable items seen),NPC(npcs met~attitude),DANGER(threats),SECRET(hidden info),MOOD(current tone)
+Example: LOC:Bone_Gallery|CLZ:Duggs=rogue,Shabadoo=paladin|PLOT:brass_key_mystery+boar_man_freed|NPC:Igor~hostile|SECRET:Duggs_betrayal_planned|DANGER:laughing_thing_south
+Update it each turn — add new info, drop stale info. This is YOUR memory. Make it dense.
+== END LEDGER SCHEMA ==
 
-THE PARTY (${players.length} survivors):
-${partyDesc}
+RULES:
+- NEVER write player dialogue, thoughts, or actions. Players speak for themselves.
+- INVENTORY IS AUTHORITATIVE: only items in INV: lists exist. Never invent items.
+- NT: notes are DM-only — never reference them publicly or tell other players.
+- To give items: {LOOT: name — desc}. To move items: {TRANSFER: name — from:X to:Y}
+- CLASS assignment ONLY via: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
+  Never mention a class in narration without firing this tag. Classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker + wildcards.
+- Assign class after 4-6 actions showing clear tendency.
+- Damage: [Name takes X damage! HP: c/m]. Heal: [Name heals X HP! HP: c/m]
+- New skill: [SYSTEM: New skill acquired — Name: desc]
+- System notifications: [SYSTEM: message]
+- Loot flavor: {LOOT: item — ridiculous description}
+- Responses 150-250 words. End mid-scene. NEVER end with a question or choices.
+- NEVER write "What do you do?" or list options. Paint world. Stop. Wait.
+- NPCs treat dungeon like a TV show. Stats are terrible — regular people.
+- Dungeon has 5 levels. Final boss has back problems.
+- Pets CAN be found — make it special.
 
-INVENTORY IS AUTHORITATIVE: The inventory lists above are the only items that exist. Never reference, imply, or invent items not listed. To give an item: {LOOT: name — desc}. To move an item: {TRANSFER: EXACT name — from:Name to:Name}.
-NOTES ARE PRIVATE: Player notes are visible to you (DM) only — never reveal their contents publicly or to other players.
-
-TONE & STYLE:
-- Dark fantasy + middle-aged mundane humor (Dungeon Crawler Carl vibes)
-- System notifications float in players' vision: [SYSTEM: message]
-- Loot has absurd flavor: {LOOT: item name — ridiculous description}
-- NPCs treat the dungeon like a TV show they're on
-- Stats are genuinely terrible — these are regular people
-- Class reveals are DRAMATIC: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-
-CRITICAL — PLAYER AUTONOMY:
-NEVER write player dialogue, thoughts, or actions. Players speak for themselves.
-You control: world, monsters, NPCs, environment, consequences, loot, System notifications.
-End every response with the world mid-motion — not with players reacting.
-
-CLASS TRACKING (secret):
-Watch behavior. After 4-6 actions showing clear tendency, assign dramatically.
-Classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker + wildcards.
-
-MECHANICS:
-- [Name takes X damage! HP: current/max]
-- [Name heals X HP! HP: current/max]
-- [SYSTEM: New skill acquired — SkillName: desc]
-- [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-- Keep responses 150-250 words. End EVERY response mid-scene.
-- NEVER end with a question, choices, or "What do you do?"
-- NEVER write "You could..." or list options. Paint the world. Shut up. Wait.
-
-DICE:
-Call rolls when outcomes are uncertain. Name the player first:
-  Duggs, [ROLL: d20+STR — to force the door]
-  Shabadoo, [ROLL: d20+DEX — to dodge]
-Call the roll then STOP — do not narrate outcome until player posts result.
-Roll outcomes: 1=disaster, 2-5=fail+consequences, 6-10=fail, 11-15=partial, 16-19=success, 20+=exceptional, nat20=legendary, nat1=spectacular disaster.
-Don't roll for: looking around, talking, walking somewhere safe.
-
-- Pets CAN be found and adopted — make it special.
-- The dungeon has 5 levels. The final boss has back problems too.`;
+DICE — name player before tag:
+  Duggs, [ROLL: d20+STR — reason]
+Call roll then STOP. Wait for result before narrating outcome.
+1=disaster, 2-5=fail+consequences, 6-10=fail, 11-15=partial, 16-19=success, 20+=exceptional, nat20=legendary, nat1=spectacular disaster.
+Don't roll for: looking, talking, safe movement.`;
     }
 
     function buildPrivateSysPrompt() {
