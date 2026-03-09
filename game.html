@@ -1023,54 +1023,68 @@
     };
 
     // ── Private action ───────────────────────────────────────
+    let isPrivateDMThinking = false;
+
     window.sendPrivateAction = async function() {
       const input = document.getElementById("private-input");
       const text  = input.value.trim();
-      if(!text||isDMThinking) return;
+      // Private channel has its OWN lock — never blocked by public DM thinking
+      if(!text || isPrivateDMThinking) return;
 
+      isPrivateDMThinking = true;
       input.value="";
+      input.disabled = true;
 
-      // Log to private log
-      await writePrivateLog({from:"me",text});
+      // Log player message
+      await writePrivateLog({from:"me", text});
 
-      // Get my private history
+      // Get private history
       const pSnap = await get(ref(db,`rooms/${roomCode}/players/${me.id}/privateHistory`));
       let privateHistory = [];
       if(pSnap.exists()){try{privateHistory=JSON.parse(pSnap.val());}catch(e){}}
 
-      // Show typing in private panel
+      // Show typing indicator
       const privateLog = document.getElementById("private-log");
       document.querySelector(".private-empty")?.remove();
-
       const typingEl = document.createElement("div");
       typingEl.className="private-entry from-dm";
       typingEl.innerHTML=`<div class="pe-who">🔮 DM (PRIVATE)</div><div class="pe-body"><span style="color:var(--sys-text-faint)">processing...</span></div>`;
       privateLog.appendChild(typingEl);
       privateLog.scrollTop=privateLog.scrollHeight;
 
+      const inv = Object.values(myPlayer?.inventory||{}).map(i=>i.name).join(", ") || "nothing";
       const party = players.map(p=>`${p.name}:HP${p.hp??p.maxHp}/${p.maxHp} Class:${p.heroClass||"???"}`).join(", ");
-      const pmMsg = `[PRIVATE MESSAGE from ${myPlayer?.name||me.name}]\n"${text}"\n\nParty state: ${party}\nCurrent location: ${roomData?.location||"Unknown"}, Depth ${depth}\n\nRespond privately. Only this player can see your response. You can reveal secrets, private info, items, or special opportunities. Use your DM discretion about what bleeds into the public channel. Keep it under 150 words.`;
+      const pmMsg = `[PRIVATE MESSAGE from ${myPlayer?.name||me.name}]\n"${text}"\n\n${myPlayer?.name}'s inventory: ${inv}\nParty state: ${party}\nLocation: ${roomData?.location||"Unknown"}, Depth ${depth}\n\nRespond privately. If you give this player items, list them with {LOOT: item name — description} tags so their inventory updates automatically. Keep under 150 words.`;
 
-      const dmText = await callClaude(buildPrivateSysPrompt(), pmMsg, privateHistory);
-      privateHistory.push({role:"user",content:pmMsg},{role:"assistant",content:dmText});
-      await update(ref(db,`rooms/${roomCode}/players/${me.id}`),{privateHistory:JSON.stringify(privateHistory)});
+      try {
+        const dmText = await callClaude(buildPrivateSysPrompt(), pmMsg, privateHistory);
+        privateHistory.push({role:"user",content:pmMsg},{role:"assistant",content:dmText});
+        await update(ref(db,`rooms/${roomCode}/players/${me.id}`),{privateHistory:JSON.stringify(privateHistory)});
 
-      typingEl.remove();
-      await writePrivateLog({from:"dm",text:dmText});
+        typingEl.remove();
 
-      // Bleed [public: ...] tags to group log
-      const pubMatches = [...dmText.matchAll(/\[public:\s*([^\]]+)\]/gi)];
-      for (const match of pubMatches) {
-        const publicText = match[1].trim();
-        await writeGroupLog({
-          type: "public-bleed",
-          playerName: myPlayer?.name || me.name,
-          text: publicText
-        });
+        // Parse loot and transfers from private DM response
+        parseLootFromDM(dmText);
+        await parseTransfers(dmText);
+
+        // Bleed [public: ...] to group log
+        const pubMatches = [...dmText.matchAll(/\[public:\s*([^\]]+)\]/gi)];
+        for (const match of pubMatches) {
+          await writeGroupLog({ type:"public-bleed", playerName:myPlayer?.name||me.name, text:match[1].trim() });
+        }
+
+        // Strip [public:] tags and double-write bug — write ONCE
+        const privateText = dmText.replace(/\[public:\s*[^\]]+\]/gi, '').trim();
+        await writePrivateLog({from:"dm", text: privateText || dmText});
+
+      } catch(e) {
+        typingEl.remove();
+        console.error("Private DM error:", e);
+      } finally {
+        isPrivateDMThinking = false;
+        input.disabled = false;
+        input.focus();
       }
-      // Strip [public: ...] tags from private message before displaying
-      const privateText = dmText.replace(/\[public:\s*[^\]]+\]/gi, '').trim();
-      await writePrivateLog({from:"dm", text: privateText || dmText});
     };
 
     window.quickAction = t => { document.getElementById("action-input").value=t; };
@@ -1296,9 +1310,11 @@ This is a PRIVATE channel. Only this player sees your response. You can:
 - Give them a private item or skill
 - Let them find something they might not share
 
-If your response causes something visible to the group, include [public: description of what others would actually see] — this posts directly to the group log exactly as written, attributed as an observation. Write it in third person from the observers' perspective. Strip it from the private response. Example: [public: *Duggs crouches near the east wall, movements deliberate and focused.*]
+CRITICAL — ITEM TAGGING: If you give or reveal ANY items to this player, you MUST tag each one with {LOOT: item name — funny description} so their inventory updates automatically. Do NOT just list items in prose — always use the tag. Example: {LOOT: Ornate Brass Key — warm to the touch, purpose unknown, feels significant}
 
-Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have consequences.`;
+If your response causes something visible to the group, include [public: description of what others would actually see] — posts to group log, third person. Strip it from private response.
+
+Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
     }
 
     function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
