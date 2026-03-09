@@ -412,6 +412,28 @@
     }
     .roll-call:hover { background: rgba(255,204,68,0.12); }
 </style>
+<style>
+    .bleed-entry {
+      border-left: 2px solid var(--sys-purple);
+      padding: 0.4rem 0.6rem;
+      margin: 0.2rem 0;
+      background: rgba(155,109,255,0.04);
+    }
+    .bleed-who {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.15em;
+      color: var(--sys-purple);
+      margin-bottom: 0.2rem;
+    }
+    .bleed-body {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--sys-text-dim);
+      font-style: italic;
+      line-height: 1.5;
+    }
+</style>
 </head>
 <body class="game-page">
 
@@ -954,11 +976,19 @@
       typingEl.remove();
       await writePrivateLog({from:"dm",text:dmText});
 
-      // DM decides if anything bleeds to group (vague hint only, based on DM text)
-      if(dmText.toLowerCase().includes("[public:")) {
-        const pubMatch = dmText.match(/\[public:\s*([^\]]+)\]/i);
-        if(pubMatch) await writeGroupLog({type:"sys",sclass:"",text:`SYSTEM: Something shifts in the air near ${myPlayer?.name||me.name}...`});
+      // Bleed [public: ...] tags to group log
+      const pubMatches = [...dmText.matchAll(/\[public:\s*([^\]]+)\]/gi)];
+      for (const match of pubMatches) {
+        const publicText = match[1].trim();
+        await writeGroupLog({
+          type: "public-bleed",
+          playerName: myPlayer?.name || me.name,
+          text: publicText
+        });
       }
+      // Strip [public: ...] tags from private message before displaying
+      const privateText = dmText.replace(/\[public:\s*[^\]]+\]/gi, '').trim();
+      await writePrivateLog({from:"dm", text: privateText || dmText});
     };
 
     window.quickAction = t => { document.getElementById("action-input").value=t; };
@@ -1149,7 +1179,7 @@ This is a PRIVATE channel. Only this player sees your response. You can:
 - Give them a private item or skill
 - Let them find something they might not share
 
-If your response causes something visible to the group, include [public: vague description] and the group will see only a vague hint.
+If your response causes something visible to the group, include [public: description of what others would actually see] — this posts directly to the group log exactly as written, attributed as an observation. Write it in third person from the observers' perspective. Strip it from the private response. Example: [public: *Duggs crouches near the east wall, movements deliberate and focused.*]
 
 Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have consequences.`;
     }
