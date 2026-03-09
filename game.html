@@ -301,6 +301,13 @@
     }
     .die-btn:hover { border-color: var(--sys-gold); color: var(--sys-gold); background: rgba(255,204,68,0.05); }
     .die-btn.rolling { animation: die-shake 0.35s ease; border-color: var(--sys-gold); color: var(--sys-gold); }
+    .die-btn.active-die {
+      border-color: var(--sys-gold);
+      color: var(--sys-gold);
+      background: rgba(255,204,68,0.12);
+      box-shadow: 0 0 12px rgba(255,204,68,0.4);
+      animation: roll-pulse 1.2s ease-in-out infinite;
+    }
     @keyframes die-shake {
       0%,100% { transform: rotate(0deg); }
       20%  { transform: rotate(-8deg) scale(1.1); }
@@ -400,6 +407,35 @@
     }
 </style>
 <style>
+    /* Pending roll blocker */
+    .roll-blocker {
+      display: none;
+      background: rgba(255,204,68,0.08);
+      border: 1px solid var(--sys-gold);
+      border-left: 3px solid var(--sys-gold);
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      animation: roll-pulse 1.5s ease-in-out infinite;
+      cursor: pointer;
+    }
+    .roll-blocker.active { display: block; }
+    @keyframes roll-pulse {
+      0%,100% { box-shadow: 0 0 8px rgba(255,204,68,0.2); }
+      50%      { box-shadow: 0 0 20px rgba(255,204,68,0.5); }
+    }
+    .roll-blocker-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--sys-gold);
+      letter-spacing: 0.1em;
+    }
+    .roll-blocker-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.55rem;
+      color: var(--sys-gold-dim);
+      letter-spacing: 0.15em;
+      margin-top: 0.2rem;
+    }
     .roll-call {
       display: inline-block;
       margin: 0.3rem 0;
@@ -418,6 +454,14 @@
       50%      { box-shadow: 0 0 16px rgba(255,204,68,0.5); }
     }
     .roll-call:hover { background: rgba(255,204,68,0.12); }
+    .roll-call.pending-roll { animation: roll-pulse 1.5s ease-in-out infinite; }
+    .roll-call-sub {
+      display: block;
+      font-size: 0.52rem;
+      letter-spacing: 0.2em;
+      color: var(--sys-gold-dim);
+      margin-top: 0.15rem;
+    }
 </style>
 <style>
     .bleed-entry {
@@ -555,7 +599,12 @@
 
         <!-- My turn -->
         <div id="my-turn-zone">
-          <div class="quick-actions">
+          <!-- Roll blocker — shown when DM has called for a mandatory roll -->
+          <div class="roll-blocker" id="roll-blocker" onclick="openRollFromDM(pendingRoll?.sides||20, pendingRoll?.stat||'', pendingRoll?.reason||'')">
+            <div class="roll-blocker-text">🎲 ROLL REQUIRED BEFORE YOU CAN ACT</div>
+            <div class="roll-blocker-sub" id="roll-blocker-desc">d20 — waiting for roll</div>
+          </div>
+          <div class="quick-actions" id="quick-actions-bar">
             <button class="qa-btn" onclick="quickAction('I carefully examine my surroundings.')">👁 Look</button>
             <button class="qa-btn" onclick="quickAction('I search the area for anything useful or hidden.')">🔍 Search</button>
             <button class="qa-btn" onclick="quickAction('I try to catch my breath and rest for a moment.')">💤 Rest</button>
@@ -921,8 +970,19 @@
           const d = desc.trim();
           return `<span class="loot" title="${d}">✦ ${n}</span>`;
         })
-        .replace(/\[ROLL:\s*([^\]]+)\]/g, (_, inner) =>
-          `<span class="roll-call" onclick="document.querySelector('.dice-fab').click()" title="Open dice tray">🎲 ROLL REQUIRED: ${inner.trim()}</span>`)
+        .replace(/\[ROLL:\s*([^\]]+)\]/g, (_, inner) => {
+          const raw = inner.trim();
+          // Parse: d20+STR, d20-DEX, d12, etc.
+          const diceMatch = raw.match(/d(\d+)/i);
+          const statMatch = raw.match(/\+\s*(STR|DEX|CON|INT|WIS|CHA)/i);
+          const sides = diceMatch ? diceMatch[1] : '20';
+          const stat  = statMatch ? statMatch[1].toUpperCase() : '';
+          const reason = raw.replace(/d\d+[+\-]?\w*\s*[—-]?\s*/i, '').trim();
+          return `<span class="roll-call pending-roll" onclick="openRollFromDM(${sides},'${stat}','${reason.replace(/'/g,"\\'")}')" title="Click to open dice tray">
+            🎲 ROLL REQUIRED — ${raw}
+            <span class="roll-call-sub">CLICK TO ROLL</span>
+          </span>`;
+        })
         .replace(/\[SYSTEM:[^\]]+\]/g, m => `<span class="mech">${m}</span>`)
         .replace(/\[([^\]]+)\]/g, m => `<span class="mech">${m}</span>`)
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -1037,6 +1097,9 @@ OPENING SCENE RULES — follow these exactly:
       await parseTransfers(dmText);
       await writeGroupLog({type:"dm",text:dmText});
 
+      // Check if DM called for a roll — set pending if this player's turn
+      checkForPendingRoll(dmText);
+
       isDMThinking=false; setTyping(false); renderTurnBar();
     }
 
@@ -1071,13 +1134,103 @@ OPENING SCENE RULES — follow these exactly:
       parseLootFromDM(dmText);
       await parseTransfers(dmText);
       await writeGroupLog({type:"dm",text:dmText});
-      await advanceTurn();
 
-      isDMThinking=false; setTyping(false);
+      // Check if DM called for a roll before advancing turn
+      const hasRoll = checkForPendingRoll(dmText);
+      if (!hasRoll) await advanceTurn();
+
+      isDMThinking=false; setTyping(false); renderTurnBar();
     };
 
     // ── Private action ───────────────────────────────────────
     let isPrivateDMThinking = false;
+
+    // ── Pending Roll State ────────────────────────────────────
+    let pendingRoll = null; // { sides, stat, reason }
+
+    window.openRollFromDM = function(sides, stat, reason) {
+      const overlay = document.getElementById('dice-overlay');
+      if (!overlay.classList.contains('open')) overlay.classList.add('open');
+      document.getElementById('dice-count').value = 1;
+      if (stat && myPlayer?.stats) {
+        const statVal = parseInt(myPlayer.stats[stat]) || 0;
+        const mod = Math.floor((statVal - 10) / 2);
+        selectedStat = stat;
+        document.getElementById('dice-mod').value = mod;
+        populateStatRow();
+      } else {
+        selectedStat = null;
+        document.getElementById('dice-mod').value = 0;
+        if (typeof populateStatRow === 'function') populateStatRow();
+      }
+      document.querySelectorAll('.die-btn').forEach(btn => {
+        btn.classList.toggle('active-die', btn.textContent.trim() === `d${sides}`);
+      });
+      window.setVisibility('public');
+      const trayTitle = document.querySelector('.dice-title');
+      if (trayTitle && reason) trayTitle.textContent = `🎲 ${reason}`;
+    };
+
+    function setPendingRoll(sides, stat, reason) {
+      pendingRoll = { sides: parseInt(sides), stat, reason };
+      const blocker = document.getElementById('roll-blocker');
+      const desc    = document.getElementById('roll-blocker-desc');
+      if (blocker) blocker.classList.add('active');
+      if (desc) desc.textContent = `d${sides}${stat ? '+'+stat : ''} — ${reason || 'the DM demands a roll'}`;
+      const input  = document.getElementById('action-input');
+      const btnAct = document.getElementById('btn-act');
+      if (input)  { input.disabled = true; input.placeholder = '⚠ Complete your roll first...'; }
+      if (btnAct) btnAct.disabled = true;
+      const qbar = document.getElementById('quick-actions-bar');
+      if (qbar) { qbar.style.opacity = '0.3'; qbar.style.pointerEvents = 'none'; }
+    }
+
+    function clearPendingRoll() {
+      pendingRoll = null;
+      const blocker = document.getElementById('roll-blocker');
+      if (blocker) blocker.classList.remove('active');
+      const input  = document.getElementById('action-input');
+      const btnAct = document.getElementById('btn-act');
+      if (input)  { input.disabled = false; input.placeholder = `What does ${myPlayer?.name||'you'} do?`; }
+      if (btnAct) btnAct.disabled = false;
+      const qbar = document.getElementById('quick-actions-bar');
+      if (qbar) { qbar.style.opacity = ''; qbar.style.pointerEvents = ''; }
+      const trayTitle = document.querySelector('.dice-title');
+      if (trayTitle) trayTitle.textContent = '🎲 DICE TRAY';
+      document.querySelectorAll('.die-btn').forEach(btn => btn.classList.remove('active-die'));
+    }
+
+    function checkForPendingRoll(text) {
+      const rollMatch = text.match(/\[ROLL:\s*d(\d+)([+\-]\s*(STR|DEX|CON|INT|WIS|CHA))?\s*[—\-]?\s*([^\]]*)/i);
+      if (!rollMatch) return false;
+
+      const sides  = rollMatch[1] || '20';
+      const stat   = rollMatch[3] ? rollMatch[3].toUpperCase() : '';
+      const reason = (rollMatch[4] || '').trim();
+
+      // Try to figure out WHO the roll is for:
+      // 1. Look for a player name mentioned in the ~60 chars before the [ROLL: tag
+      const rollIdx = text.search(/\[ROLL:/i);
+      const nearby  = rollIdx > 0 ? text.slice(Math.max(0, rollIdx - 120), rollIdx) : '';
+      let targetPlayer = null;
+      for (const p of players) {
+        const firstName = p.name.split(' ')[0];
+        if (nearby.toLowerCase().includes(firstName.toLowerCase())) {
+          targetPlayer = p;
+          break;
+        }
+      }
+      // 2. Fall back to current turn actor
+      if (!targetPlayer) targetPlayer = players[turnIndex];
+
+      // Only activate blocker on MY screen if I'm the target
+      if (!targetPlayer || targetPlayer.id !== me.id) return false;
+
+      setPendingRoll(sides, stat, reason);
+      setTimeout(() => openRollFromDM(sides, stat, reason), 300);
+      return true;
+    }
+
 
     window.sendPrivateAction = async function() {
       const input = document.getElementById("private-input");
@@ -1326,12 +1479,14 @@ MECHANICS:
 DICE & OUTCOMES:
 Players have a physical dice tray. When an action has uncertain, risky, or dramatic outcomes, DEMAND a roll before narrating the result. Do not auto-resolve things that should be decided by dice.
 
-Call for rolls like this:
-  [ROLL: d20+STR — to force the rusted door]
-  [ROLL: d20+DEX — to dodge the falling debris]
-  [ROLL: d20+CHA — to convince the goblin you're his supervisor]
-  [ROLL: d20+INT — to recall dungeon architecture]
-  [ROLL: d20 — pure luck, no stat applies]
+Call for rolls like this — ALWAYS say the player's name immediately before the tag so the system knows who must roll:
+  Duggs, [ROLL: d20+STR — to force the rusted door]
+  Shabadoo, [ROLL: d20+DEX — to dodge the falling debris]
+  [PlayerName], [ROLL: d20+CHA — to convince the goblin you're their supervisor]
+  [PlayerName], [ROLL: d20+INT — to recall dungeon architecture]
+  [PlayerName], [ROLL: d20 — pure luck, no stat applies]
+
+The player's name MUST appear directly before the [ROLL:] tag every time — this is how the system routes the dice roll to the correct player's screen.
 
 When you call for a roll, STOP. Do not narrate what happens yet. Wait for the player to post their result.
 When the player posts a number, narrate based on that number:
@@ -1813,6 +1968,7 @@ Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
 
       if (diceVisibility === 'public') {
         await writeGroupLog({ type: 'roll', text: rollStr, playerName });
+        if (pendingRoll) { clearPendingRoll(); await advanceTurn(); }
       } else {
         // Secret — write to private log only, DM sees via system
         const key = push(ref(db, `rooms/${roomCode}/players/${me.id}/privateLog`)).key;
