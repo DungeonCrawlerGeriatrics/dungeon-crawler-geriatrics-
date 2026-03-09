@@ -1144,16 +1144,26 @@ OPENING SCENE RULES:
       const encodedState = encodeGameState();
       const ledger = storyLedger || buildLedgerFromHistory();
 
+      // Inject private context threads — whispers that should inform group narration
+      const privateContexts = players
+        .filter(p => p.privateContext)
+        .map(p => `${p.name}: ${p.privateContext}`)
+        .join('\n');
+
+      const privBlock = privateContexts
+        ? `\n#PRIVATE_THREADS (DM only — secrets whispered privately, inform narration but never reveal directly)\n${privateContexts}`
+        : '';
+
       const msg = `#STATE
 ${encodedState}
 
 #LEDGER
-${ledger || "∅ (game just started)"}
+${ledger || '\u2205 (game just started)'}${privBlock}
 
 #ACTION
 ${actor?.name} (${actor?.heroClass||"UNASSIGNED"}) acts: "${text}"
 
-Narrate result. End with [LEDGER_UPDATE: updated_ledger] — update your memory with what just happened. {LOOT: name — desc} for items. {TRANSFER: name — from:X to:Y} to move items. Use [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] only when assigning.`;
+Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name \u2014 desc} for items. {TRANSFER: name \u2014 from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT \u2014 Name is now ClassName!] only when assigning.\`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
@@ -1294,9 +1304,20 @@ Narrate result. End with [LEDGER_UPDATE: updated_ledger] — update your memory 
       privateLog.appendChild(typingEl);
       privateLog.scrollTop=privateLog.scrollHeight;
 
-      const inv = Object.values(myPlayer?.inventory||{}).map(i=>i.name).join(", ") || "nothing";
-      const party = players.map(p=>`${p.name}:HP${p.hp??p.maxHp}/${p.maxHp} Class:${p.heroClass||"???"}`).join(", ");
-      const pmMsg = `[PRIVATE MESSAGE from ${myPlayer?.name||me.name}]\n"${text}"\n\n${myPlayer?.name}'s inventory: ${inv}\nParty state: ${party}\nLocation: ${roomData?.location||"Unknown"}, Depth ${depth}\n\nRespond privately. If you give this player items, list them with {LOOT: item name — description} tags so their inventory updates automatically. Keep under 150 words.`;
+      const encodedState = encodeGameState();
+      const ledger = storyLedger || buildLedgerFromHistory();
+      const pmMsg = `#STATE
+${encodedState}
+
+#LEDGER (shared story so far)
+${ledger || "∅"}
+
+#PRIVATE_MESSAGE from ${myPlayer?.name||me.name}:
+"${text}"
+
+Respond privately. Only this player sees this.
+After your response, write [PRIV_CTX: one-line compressed summary of what was just discussed/decided/revealed] so the group DM context stays aware of private threads. Keep it under 80 chars. Format: topic~detail+topic~detail
+Example: [PRIV_CTX: brass_key~warm_in_dungeon+Duggs_suspicious_of_Shabadoo]`;
 
       try {
         const dmText = await callClaude(buildPrivateSysPrompt(), pmMsg, privateHistory);
@@ -1309,16 +1330,28 @@ Narrate result. End with [LEDGER_UPDATE: updated_ledger] — update your memory 
         parseLootFromDM(dmText);
         await parseTransfers(dmText);
 
+        // Extract and save private context summary for group DM awareness
+        // DM writes [PRIV_CTX: compressed summary] which bleeds into group context
+        const ctxMatch = dmText.match(/\[PRIV_CTX:\s*([^\]]+)\]/i);
+        if (ctxMatch) {
+          const existing = myPlayer?.privateContext || "";
+          const newCtx = existing ? existing + "|" + ctxMatch[1].trim() : ctxMatch[1].trim();
+          // Keep last 500 chars
+          const trimmed = newCtx.length > 500 ? newCtx.slice(-500) : newCtx;
+          await update(ref(db, `rooms/${roomCode}/players/${me.id}`), { privateContext: trimmed });
+        }
+
         // Bleed [public: ...] to group log
         const pubMatches = [...dmText.matchAll(/\[public:\s*([^\]]+)\]/gi)];
         for (const match of pubMatches) {
           await writeGroupLog({ type:"public-bleed", playerName:myPlayer?.name||me.name, text:match[1].trim() });
         }
 
-        // Strip [public:] tags and double-write bug — write ONCE
+        // Strip mechanical tags — write clean text to private log
         const privateText = dmText
           .replace(/\[public:\s*[^\]]+\]/gi, '')
           .replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '')
+          .replace(/\[PRIV_CTX:[^\]]+\]/gi, '')
           .trim();
         await writePrivateLog({from:"dm", text: privateText || dmText});
 
@@ -1595,46 +1628,29 @@ Don't roll for: looking, talking, safe movement.`;
     }
 
     function buildPrivateSysPrompt() {
-      const partyDesc = players.map(p => {
-        const inv    = Object.values(p.inventory||{});
-        const invList = inv.length
-          ? inv.map(i => `"${i.name}"${i.desc ? ` — ${i.desc}` : ''}`).join("; ")
-          : "empty";
-        const skills = Object.values(p.skills||{}).map(s => `${s.name}${s.desc?' ('+s.desc+')':''}`).join("; ") || "none";
-        const notes  = p.notes ? `\n  Private notes: "${p.notes}"` : "";
-        const s      = p.stats||{};
-        const statStr = Object.entries(s).map(([k,v])=>`${k}:${v}`).join(" ");
-        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"???"} | ${statStr}\n  Inventory: [${invList}]\n  Skills: ${skills}${notes}`;
-      }).join("\n\n");
-
+      const ledger = storyLedger || buildLedgerFromHistory();
       return `You are the DM for Dungeon Crawler Geriatrics. A player is whispering to you PRIVATELY.
 
-PARTY INVENTORIES (authoritative — these are the ONLY items that exist):
-${partyDesc}
-Location: ${roomData?.location||"Unknown"} | Depth: ${depth}
+== ENCODED STATE SCHEMA — same as group DM ==
+@Name|CLS|HPc/m|MPc/m|stats  /  INV:items  /  SK:skills  /  NT:private_notes  /  BS:backstory
+== END SCHEMA ==
 
-WHAT THE PRIVATE CHANNEL IS FOR:
-- Player shares a secret plan, asks a quiet question, or makes a private move
-- You give them information only they know (a clue, a warning, a secret about another player)
-- You give them a private item or opportunity
-- You confirm or deny something behind the scenes
+#GROUP_STORY_LEDGER (what has happened publicly so far):
+${ledger || "∅ (game just started)"}
 
-WHAT THE PRIVATE CHANNEL IS NOT FOR:
-- Roleplaying scenes between players — those happen in the PUBLIC channel
-- Writing other players' dialogue or reactions — NEVER put words in another player's mouth
-- Narrating group confrontations — if something involves another player, it goes public
-- Carrying on a back-and-forth story — private is for SHORT whispers, not full scenes
+INVENTORY IS AUTHORITATIVE: Only items in the #STATE INV: lists exist. Never invent items.
+NT: notes are DM-only — never reveal to other players.
 
-IF THE PLAYER'S ACTION AFFECTS ANOTHER PLAYER OR IS VISIBLE:
-Use [public: exactly what the group would see, third person, no player dialogue] and keep the private response to just what only THIS player knows privately. The [public:] content posts to the group log automatically.
+PRIVATE CHANNEL RULES:
+- For short whispers, secret info, private items, behind-the-scenes moves
+- NOT for scenes between players, other players' dialogue, or group confrontations
+- If action is visible to the group: [public: what others see — third person, no player dialogue]
+- New items: {LOOT: name — desc}. Move items: {TRANSFER: EXACT name — from:X to:Y}
 
-EXAMPLE — player says "I pickpocket Shabadoo":
-WRONG private response: write Shabadoo's reaction and dialogue
-RIGHT private response: Tell this player what they found (and tag any items with {LOOT:} or {TRANSFER:}), then use [public: Duggs's hand moves quickly near Shabadoo's side.]
+After your response, write [PRIV_CTX: compressed_summary] (under 80 chars) so this thread stays in the group DM's awareness.
+Format: topic~detail+topic~detail  Example: [PRIV_CTX: brass_key~warm_reacts_to_dungeon+plans_to_hide_from_Shabadoo]
 
-INVENTORY RULE: Only reference items in the lists above. Never invent items. Tag new items with {LOOT: name — desc}. Move items with {TRANSFER: EXACT item name — from:SenderName to:ReceiverName}.
-
-Keep private response under 80 words. Short. Conspiratorial. Just the secret part.`;
+Keep response under 80 words. Short. Conspiratorial.`;
     }
 
     function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
