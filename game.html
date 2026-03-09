@@ -1200,7 +1200,10 @@
       const partyDesc = players.map(p=>{
         const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
         const notes = p.id === me.id ? "" : (p.notes ? ` | Notes (private): "${p.notes}"` : "");
-        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | Inventory: ${inv}${notes}`;
+        const backstory = p.backstory ? `\n  Backstory: ${p.backstory.slice(0,300)}...` : "";
+        const skills = Object.values(p.skills||{}).map(s=>s.name).join(", ");
+        const skillStr = skills ? ` | Starting skills: ${skills}` : "";
+        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | Inventory: ${inv}${skillStr}${notes}${backstory}`;
       }).join("\n");
       return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
 

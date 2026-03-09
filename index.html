@@ -133,7 +133,7 @@
           log: {}
         });
         sessionStorage.setItem("dcg_player", JSON.stringify({id:playerId, name, roomCode, isHost:true}));
-        window.location.href = `waiting.html?room=${roomCode}`;
+        window.location.href = `quiz.html?room=${roomCode}`;
       } catch(e) {
         console.error(e);
         err("⚠ FIREBASE ERROR — check console");
@@ -168,7 +168,7 @@
           privateHistory: "[]"
         });
         sessionStorage.setItem("dcg_player", JSON.stringify({id:playerId, name, roomCode:code, isHost:false}));
-        window.location.href = `waiting.html?room=${code}`;
+        window.location.href = `quiz.html?room=${code}`;
       } catch(e) {
         console.error(e);
         err("⚠ FIREBASE ERROR — check console");

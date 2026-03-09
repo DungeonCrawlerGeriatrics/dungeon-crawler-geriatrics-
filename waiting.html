@@ -6,6 +6,93 @@
 <title>Staging Area — Dungeon Crawler Geriatrics</title>
 <link rel="stylesheet" href="css/global.css">
 <link rel="stylesheet" href="css/waiting.css">
+<style>
+    .wr-dossiers {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 0.5rem;
+    }
+    .dossier-card {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--sys-border);
+      border-left: 3px solid var(--sys-gold-dim);
+      padding: 0.85rem 1rem;
+      animation: dos-in 0.3s ease;
+    }
+    @keyframes dos-in { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+    .dos-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    .dos-name {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--sys-gold);
+      letter-spacing: 0.1em;
+    }
+    .dos-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 0.2em;
+      color: var(--sys-text-faint);
+    }
+    .dos-body {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--sys-text-dim);
+      line-height: 1.6;
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .dos-body::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 24px;
+      background: linear-gradient(transparent, rgba(5,6,8,0.9));
+    }
+    .dos-expand {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.52rem;
+      color: var(--sys-text-faint);
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      margin-top: 0.3rem;
+      background: none; border: none; outline: none; padding: 0;
+    }
+    .dos-expand:hover { color: var(--sys-gold); }
+    .dos-body.expanded { max-height: none; }
+    .dos-body.expanded::after { display: none; }
+    .dos-skills {
+      display: flex; flex-wrap: wrap; gap: 0.3rem;
+      margin-top: 0.5rem;
+    }
+    .dos-skill-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.52rem;
+      padding: 0.15rem 0.5rem;
+      border: 1px solid var(--sys-gold-dim);
+      color: var(--sys-gold);
+      letter-spacing: 0.05em;
+    }
+    .wr-dossier-hd {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.25em;
+      color: var(--sys-text-dim);
+      margin-top: 0.5rem;
+    }
+    .waiting-for-quiz {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--sys-text-faint);
+      letter-spacing: 0.1em;
+      font-style: italic;
+      padding: 0.5rem 0;
+    }
+</style>
 </head>
 <body class="waiting-page">
 
@@ -34,6 +121,12 @@
       <span id="slot-count">0 / 4 JOINED</span>
     </div>
     <div class="wr-slots" id="player-slots"></div>
+
+    <!-- Dossiers -->
+    <div class="wr-dossier-hd">// SYSTEM DOSSIERS — FILED ON ARRIVAL</div>
+    <div class="wr-dossiers" id="wr-dossiers">
+      <div class="waiting-for-quiz">Waiting for participants to complete assessment...</div>
+    </div>
 
     <!-- Status -->
     <div class="wr-status">
@@ -138,6 +231,7 @@
                 ${isHost ? `<span class="slot-tag host">HOST</span>` : ""}
                 ${isMe   ? `<span class="slot-tag you">YOU</span>`  : ""}
                 <span class="slot-tag ready">ONLINE</span>
+                ${p.quizDone ? '<span class="slot-tag" style="border-color:#005a30;color:var(--sys-green)">✓ ASSESSED</span>' : '<span class="slot-tag" style="border-color:var(--sys-gold-dim);color:var(--sys-gold)">ASSESSING...</span>'}
               </div>
             </div>
             <div class="online-dot"></div>
@@ -154,6 +248,34 @@
         statusEl.innerHTML = `<span class="hi">SYSTEM:</span> <span class="ok">Party capacity reached. Instance ready to begin.</span>`;
       }
 
+      // Render dossiers
+      const dossiers = room.backstories || {};
+      const dossierContainer = document.getElementById('wr-dossiers');
+      const renderedDossiers = new Set([...dossierContainer.querySelectorAll('.dossier-card')].map(d => d.dataset.pid));
+      let hasAny = Object.keys(dossiers).length > 0;
+      if (hasAny) dossierContainer.querySelector('.waiting-for-quiz')?.remove();
+
+      Object.entries(dossiers).forEach(([pid, d]) => {
+        if (renderedDossiers.has(pid)) return;
+        const card = document.createElement('div');
+        card.className = 'dossier-card';
+        card.dataset.pid = pid;
+        const skillTags = (d.skills||[]).map(s => `<span class="dos-skill-tag">${s.icon||'⚡'} ${s.name}</span>`).join('');
+        card.innerHTML = `
+          <div class="dos-header">
+            <span class="dos-name">[ DOSSIER: ${d.name} ]</span>
+            <span class="dos-label">SYSTEM CLASSIFIED</span>
+          </div>
+          <div class="dos-body" id="dos-body-${pid}">${(d.backstory||'').replace(/\n/g,'<br>')}</div>
+          <button class="dos-expand" onclick="
+            const b=document.getElementById('dos-body-${pid}');
+            b.classList.toggle('expanded');
+            this.textContent=b.classList.contains('expanded')?'[ COLLAPSE ]':'[ READ MORE ]';
+          ">[ READ MORE ]</button>
+          <div class="dos-skills">${skillTags}</div>`;
+        dossierContainer.appendChild(card);
+      });
+
       // Show new player join toast
       if (count > lastPlayerCount && lastPlayerCount > 0) {
         const newPlayer = players[count - 1];
@@ -169,7 +291,7 @@
             [ INITIALIZE INSTANCE ]
           </button>
           <div class="begin-warning">
-            You can start with 1-4 players · Others can still join mid-game
+            ${count > 0 && Object.keys(room.backstories||{}).length < count ? `⚠ ${count - Object.keys(room.backstories||{}).length} player(s) still completing assessment` : '✓ All assessments filed — ready to begin'}
           </div>`;
       } else {
         beginEl.innerHTML = `

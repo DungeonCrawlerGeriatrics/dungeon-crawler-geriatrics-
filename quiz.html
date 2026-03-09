@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Assessment — Dungeon Crawler Geriatrics</title>
+<link rel="stylesheet" href="css/global.css">
+<style>
+  .quiz-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 2rem 1rem 4rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .quiz-page::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+    animation: grid-drift 30s linear infinite;
+  }
+  @keyframes grid-drift { to { background-position: 40px 40px; } }
+
+  .quiz-wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Header */
+  .quiz-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-top: 1rem;
+  }
+  .quiz-header-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.4em;
+    color: var(--sys-glow-dim);
+    margin-bottom: 0.5rem;
+  }
+  .quiz-header-title {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: clamp(1rem, 3.5vw, 1.6rem);
+    color: var(--sys-text);
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+  .quiz-header-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--sys-text-dim);
+    letter-spacing: 0.1em;
+    line-height: 1.6;
+  }
+  .quiz-header-sub .warn { color: var(--sys-gold); }
+
+  /* Progress */
+  .quiz-progress {
+    margin-bottom: 1.5rem;
+  }
+  .progress-bar-track {
+    height: 2px;
+    background: var(--sys-border);
+    position: relative;
+    margin-bottom: 0.5rem;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--sys-glow);
+    box-shadow: 0 0 8px rgba(0,212,255,0.5);
+    transition: width 0.4s ease;
+  }
+  .progress-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    color: var(--sys-text-faint);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Question card */
+  .question-card {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--sys-border);
+    border-left: 3px solid var(--sys-glow-dim);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    animation: q-in 0.25s ease;
+  }
+  @keyframes q-in {
+    from { opacity:0; transform: translateX(-8px); }
+    to   { opacity:1; transform: translateX(0); }
+  }
+
+  .q-number {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.52rem;
+    letter-spacing: 0.3em;
+    color: var(--sys-glow-dim);
+    margin-bottom: 0.5rem;
+  }
+  .q-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--sys-text);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+    margin-bottom: 0.4rem;
+  }
+  .q-subtext {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--sys-text-faint);
+    font-style: italic;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Answer types */
+  .answer-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .answer-opt {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    padding: 0.65rem 0.9rem;
+    border: 1px solid var(--sys-border);
+    background: transparent;
+    color: var(--sys-text-dim);
+    cursor: pointer;
+    text-align: left;
+    outline: none;
+    transition: all 0.15s;
+    line-height: 1.4;
+  }
+  .answer-opt:hover { border-color: var(--sys-glow-dim); color: var(--sys-text); background: rgba(0,212,255,0.04); }
+  .answer-opt.selected { border-color: var(--sys-glow); color: var(--sys-glow); background: rgba(0,212,255,0.08); }
+
+  .answer-text-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
+  .answer-text {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--sys-border);
+    color: var(--sys-text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.65rem 0.9rem;
+    outline: none;
+    resize: none;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+  }
+  .answer-text:focus { border-color: var(--sys-glow-dim); }
+  .answer-text::placeholder { color: var(--sys-text-faint); }
+
+  /* Nav buttons */
+  .quiz-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+  .btn-prev {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    padding: 0.6rem 1.2rem;
+    border: 1px solid var(--sys-border);
+    background: transparent;
+    color: var(--sys-text-dim);
+    cursor: pointer;
+    outline: none;
+    transition: all 0.15s;
+  }
+  .btn-prev:hover { border-color: var(--sys-text-dim); color: var(--sys-text); }
+  .btn-prev:disabled { opacity: 0.2; cursor: default; }
+  .btn-next {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    padding: 0.7rem 2rem;
+    border: 1px solid var(--sys-glow-dim);
+    background: transparent;
+    color: var(--sys-glow);
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .btn-next:hover { border-color: var(--sys-glow); box-shadow: 0 0 16px rgba(0,212,255,0.3); }
+  .btn-next:disabled { opacity: 0.3; cursor: not-allowed; box-shadow: none; }
+
+  /* Generation screen */
+  .gen-screen {
+    display: none;
+    text-align: center;
+    padding: 3rem 1rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .gen-screen.active { display: flex; }
+  .gen-spinner {
+    width: 48px; height: 48px;
+    border: 2px solid var(--sys-border);
+    border-top-color: var(--sys-glow);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 0.5rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gen-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--sys-glow);
+  }
+  .gen-sublabel {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    color: var(--sys-text-faint);
+    animation: gen-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes gen-pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+  /* Backstory reveal */
+  .backstory-screen {
+    display: none;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .backstory-screen.active { display: flex; }
+  .backstory-header {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.3em;
+    color: var(--sys-gold);
+    text-align: center;
+  }
+  .backstory-name {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 1.4rem;
+    color: var(--sys-text);
+    text-align: center;
+  }
+  .backstory-body {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--sys-border);
+    border-left: 3px solid var(--sys-gold-dim);
+    padding: 1.2rem 1.4rem;
+    font-family: 'IM Fell English', serif;
+    font-size: 0.88rem;
+    color: var(--sys-text);
+    line-height: 1.8;
+  }
+  .backstory-skills {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--sys-border);
+    padding: 1rem 1.2rem;
+  }
+  .bs-skills-hd {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.25em;
+    color: var(--sys-text-dim);
+    margin-bottom: 0.75rem;
+  }
+  .bs-skill-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .bs-skill {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--sys-border);
+  }
+  .bs-skill:last-child { border-bottom: none; }
+  .bs-skill-icon { font-size: 0.9rem; flex-shrink: 0; }
+  .bs-skill-name { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--sys-gold); }
+  .bs-skill-desc { font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; color: var(--sys-text-dim); margin-top: 0.15rem; line-height: 1.4; }
+  .btn-confirm {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    padding: 1rem 3rem;
+    border: 1px solid var(--sys-green);
+    background: transparent;
+    color: var(--sys-green);
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    animation: confirm-pulse 2s ease-in-out infinite;
+    align-self: center;
+    margin-top: 0.5rem;
+  }
+  @keyframes confirm-pulse {
+    0%,100% { box-shadow: 0 0 8px rgba(0,255,136,0.2); }
+    50%      { box-shadow: 0 0 24px rgba(0,255,136,0.5); }
+  }
+  .btn-confirm:hover { background: rgba(0,255,136,0.08); }
+</style>
+</head>
+<body class="quiz-page">
+  <div class="quiz-wrap" id="quiz-wrap">
+
+    <!-- Header -->
+    <div class="quiz-header">
+      <div class="quiz-header-label">[ SYSTEM ASSESSMENT PROTOCOL ]</div>
+      <div class="quiz-header-title">Character Evaluation<br>& Background Verification</div>
+      <div class="quiz-header-sub">
+        The System requires data to properly categorize you.<br>
+        <span class="warn">Answers will be used against you.</span>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="quiz-progress" id="quiz-progress">
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-label">
+        <span id="progress-text">QUESTION 1 OF 14</span>
+        <span id="progress-pct">0%</span>
+      </div>
+    </div>
+
+    <!-- Question card -->
+    <div id="question-area"></div>
+
+    <!-- Nav -->
+    <div class="quiz-nav" id="quiz-nav">
+      <button class="btn-prev" id="btn-prev" onclick="prevQ()" disabled>← BACK</button>
+      <button class="btn-next" id="btn-next" onclick="nextQ()" disabled>NEXT →</button>
+    </div>
+
+    <!-- Generating screen -->
+    <div class="gen-screen" id="gen-screen">
+      <div class="gen-spinner"></div>
+      <div class="gen-label">SYSTEM PROCESSING<span class="blink">_</span></div>
+      <div class="gen-sublabel">Fabricating your entire life history...</div>
+    </div>
+
+    <!-- Backstory reveal -->
+    <div class="backstory-screen" id="backstory-screen">
+      <div class="backstory-header">[ OFFICIAL SYSTEM DOSSIER — CLASSIFIED ]</div>
+      <div class="backstory-name" id="bs-name"></div>
+      <div class="backstory-body" id="bs-body"></div>
+      <div class="backstory-skills">
+        <div class="bs-skills-hd">// STARTING SKILLS — DERIVED FROM LIFE EXPERIENCE</div>
+        <div class="bs-skill-list" id="bs-skills"></div>
+      </div>
+      <button class="btn-confirm" onclick="confirmAndProceed()">
+        [ ACCEPT YOUR FATE ]
+      </button>
+    </div>
+
+  </div>
+
+  <script type="module">
+    const params   = new URLSearchParams(window.location.search);
+    const roomCode = params.get("room");
+    const me       = JSON.parse(sessionStorage.getItem("dcg_player") || "null");
+    if (!roomCode || !me) { window.location.href = "index.html"; }
+
+    const QUESTIONS = [
+      {
+        id: "job",
+        text: "What do you do for a living?",
+        sub: "Be specific. The System will use this.",
+        type: "text",
+        placeholder: "e.g. Regional manager of a mid-size paper company..."
+      },
+      {
+        id: "fitness",
+        text: "How would you describe your current physical condition?",
+        sub: "Honesty is mandatory. The System already knows.",
+        type: "options",
+        options: [
+          "I could run a 5K. Slowly. But I could.",
+          "I take the stairs sometimes. That counts.",
+          "My idea of cardio is arguing loudly.",
+          "I have a gym membership I feel guilty about.",
+          "I once pulled a muscle reaching for the remote."
+        ]
+      },
+      {
+        id: "hobby",
+        text: "What do you do in your free time?",
+        sub: "The System is scanning for transferable dungeon skills.",
+        type: "text",
+        placeholder: "e.g. I collect vintage spoons and watch true crime..."
+      },
+      {
+        id: "crisis",
+        text: "A fire breaks out. You have 30 seconds. What do you grab?",
+        sub: "This reveals everything about you.",
+        type: "options",
+        options: [
+          "My phone, wallet, and the good snacks",
+          "My pets. Obviously my pets first.",
+          "The external hard drive with my stuff on it",
+          "I freeze and then follow whoever seems confident",
+          "I probably started the fire, honestly"
+        ]
+      },
+      {
+        id: "villain",
+        text: "What's your most villainous quality?",
+        sub: "The System finds this... promising.",
+        type: "options",
+        options: [
+          "I eat the last slice without asking",
+          "I know everyone's secrets and say nothing",
+          "I'm always late and feel no remorse",
+          "I argue about things I know nothing about",
+          "I weaponize passive aggression with surgical precision"
+        ]
+      },
+      {
+        id: "fight",
+        text: "You're in a fight. What's your move?",
+        sub: "You have no combat training. Be realistic.",
+        type: "options",
+        options: [
+          "Talk my way out. Failing that, run.",
+          "Find the biggest thing nearby and throw it",
+          "Negotiate aggressively until someone backs down",
+          "Bite. I would absolutely bite.",
+          "Cry in a tactically effective way"
+        ]
+      },
+      {
+        id: "secret",
+        text: "What's a skill you have that nobody knows about?",
+        sub: "Hidden talents often manifest as dungeon abilities.",
+        type: "text",
+        placeholder: "e.g. I can identify wine regions by smell alone..."
+      },
+      {
+        id: "fear",
+        text: "What are you genuinely afraid of?",
+        sub: "The dungeon has noted this. You're welcome.",
+        type: "text",
+        placeholder: "e.g. Being perceived. And also large moths."
+      },
+      {
+        id: "group_role",
+        text: "In a group project, you are always the one who...",
+        sub: "The System is assigning your social function.",
+        type: "options",
+        options: [
+          "Does everything because you can't trust anyone else",
+          "Has the best ideas but won't write them down",
+          "Keeps everyone calm when things go sideways",
+          "Disappears and then takes credit at the end",
+          "Makes it fun even when it's going horribly"
+        ]
+      },
+      {
+        id: "food",
+        text: "What's your go-to comfort food in a crisis?",
+        sub: "Nutritional choices reflect combat philosophy.",
+        type: "text",
+        placeholder: "e.g. An entire rotisserie chicken, alone, in my car..."
+      },
+      {
+        id: "biggest_win",
+        text: "What's the most impressive thing you've ever done?",
+        sub: "Bragging is encouraged. The System is watching for delusion.",
+        type: "text",
+        placeholder: "e.g. I once parallel parked perfectly on the first try..."
+      },
+      {
+        id: "biggest_fail",
+        text: "What's your most spectacular failure?",
+        sub: "The dungeon feeds on regret.",
+        type: "text",
+        placeholder: "e.g. I sent a complaint email to the wrong entire company..."
+      },
+      {
+        id: "tv_character",
+        text: "Which TV character are you most like, and why?",
+        sub: "The System cross-references fictional archetypes.",
+        type: "text",
+        placeholder: "e.g. A blend of Michael Scott and a golden retriever..."
+      },
+      {
+        id: "last_words",
+        text: "If you died in the dungeon, what would your last words be?",
+        sub: "The System is taking notes for your epitaph.",
+        type: "text",
+        placeholder: "e.g. I just want everyone to know that Jake started this..."
+      }
+    ];
+
+    let current = 0;
+    let answers  = {};
+    let generatedData = null;
+
+    function renderQuestion() {
+      const q    = QUESTIONS[current];
+      const pct  = Math.round((current / QUESTIONS.length) * 100);
+      document.getElementById("progress-fill").style.width = pct + "%";
+      document.getElementById("progress-text").textContent = `QUESTION ${current+1} OF ${QUESTIONS.length}`;
+      document.getElementById("progress-pct").textContent  = pct + "%";
+      document.getElementById("btn-prev").disabled = current === 0;
+
+      const area = document.getElementById("question-area");
+      area.innerHTML = "";
+
+      const card = document.createElement("div");
+      card.className = "question-card";
+      card.innerHTML = `
+        <div class="q-number">ASSESSMENT ${String(current+1).padStart(2,'0')} / ${QUESTIONS.length}</div>
+        <div class="q-text">${q.text}</div>
+        ${q.sub ? `<div class="q-subtext">${q.sub}</div>` : ""}
+      `;
+
+      if (q.type === "options") {
+        const opts = document.createElement("div");
+        opts.className = "answer-options";
+        q.options.forEach(opt => {
+          const btn = document.createElement("button");
+          btn.className = "answer-opt" + (answers[q.id] === opt ? " selected" : "");
+          btn.textContent = opt;
+          btn.onclick = () => {
+            answers[q.id] = opt;
+            opts.querySelectorAll(".answer-opt").forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+            document.getElementById("btn-next").disabled = false;
+          };
+          opts.appendChild(btn);
+        });
+        card.appendChild(opts);
+      } else {
+        const wrap = document.createElement("div");
+        wrap.className = "answer-text-wrap";
+        const ta = document.createElement("textarea");
+        ta.className = "answer-text";
+        ta.placeholder = q.placeholder || "Type your answer...";
+        ta.rows = 3;
+        ta.value = answers[q.id] || "";
+        ta.addEventListener("input", () => {
+          answers[q.id] = ta.value.trim();
+          document.getElementById("btn-next").disabled = !ta.value.trim();
+        });
+        wrap.appendChild(ta);
+        card.appendChild(wrap);
+        setTimeout(() => ta.focus(), 50);
+      }
+
+      area.appendChild(card);
+      document.getElementById("btn-next").disabled = !answers[q.id];
+      document.getElementById("btn-next").textContent = current === QUESTIONS.length - 1 ? "SUBMIT TO THE SYSTEM →" : "NEXT →";
+    }
+
+    window.nextQ = function() {
+      if (!answers[QUESTIONS[current].id]) return;
+      if (current < QUESTIONS.length - 1) {
+        current++;
+        renderQuestion();
+      } else {
+        generateBackstory();
+      }
+    };
+
+    window.prevQ = function() {
+      if (current > 0) { current--; renderQuestion(); }
+    };
+
+    // Allow Enter to advance on text questions
+    document.addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.ctrlKey) window.nextQ();
+    });
+
+    async function generateBackstory() {
+      // Hide quiz, show generator
+      document.getElementById("question-area").style.display = "none";
+      document.getElementById("quiz-nav").style.display  = "none";
+      document.getElementById("quiz-progress").style.display = "none";
+      document.getElementById("gen-screen").classList.add("active");
+
+      const playerName = me.name;
+      const answerBlock = QUESTIONS.map(q => `${q.text}\n→ ${answers[q.id] || "(skipped)"}`).join("\n\n");
+
+      const prompt = `You are the sardonic System AI from a LitRPG dungeon. You have just received the Character Assessment responses for ${playerName}, who has been involuntarily drafted into a dungeon instance.
+
+Based on these answers, write:
+
+1. A BACKSTORY (3-4 paragraphs, ~250 words): An absurdly specific, funny, and slightly tragic biography of ${playerName}. Reference their actual answers directly. Make it feel like an official System dossier — clinical tone that slowly gets funnier. Include their mundane life before the dungeon. End with the moment the System grabbed them.
+
+2. SKILLS (exactly 3 starting skills): Based on their life experience, invent 3 starting skills. Each should be:
+- Genuinely derived from something in their answers
+- Funny but plausibly useful in a dungeon
+- Named like a D&D ability (e.g. "Passive-Aggressive Aura", "Corporate Survival Instinct")
+
+Respond ONLY in this exact JSON format, no other text:
+{
+  "backstory": "...",
+  "skills": [
+    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"},
+    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"},
+    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"}
+  ]
+}
+
+ASSESSMENT ANSWERS:
+${answerBlock}`;
+
+      try {
+        const res = await fetch("https://dcg-proxy.blaine-anthony.workers.dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 1200,
+            messages: [{ role: "user", content: prompt }]
+          })
+        });
+        const data = await res.json();
+        const text = data.content?.[0]?.text || "";
+        const clean = text.replace(/```json|```/g, "").trim();
+        generatedData = JSON.parse(clean);
+        showBackstory();
+      } catch(e) {
+        console.error("Generation failed:", e);
+        // Fallback
+        generatedData = {
+          backstory: `${playerName} existed. The System noticed. This is that story.\n\nThe details of ${playerName}'s pre-dungeon life remain classified pending further System review. What we know: they were there. They had a couch. They had snacks. The snacks are now in the dungeon with them.\n\nThe System has assessed their life history and found it... adequate. Barely.`,
+          skills: [
+            { name: "Survivor's Instinct", desc: "You've survived this long. Somehow.", icon: "🧠" },
+            { name: "Dungeon Pragmatism", desc: "When in doubt, improvise wildly.", icon: "⚡" },
+            { name: "The Audacity", desc: "Attempt things you have no business attempting.", icon: "🎯" }
+          ]
+        };
+        showBackstory();
+      }
+    }
+
+    function showBackstory() {
+      document.getElementById("gen-screen").classList.remove("active");
+      document.getElementById("backstory-screen").classList.add("active");
+      document.getElementById("bs-name").textContent = me.name;
+
+      // Format backstory — newlines to paragraphs
+      const paras = generatedData.backstory.split(/\n+/).filter(Boolean);
+      document.getElementById("bs-body").innerHTML = paras.map(p => `<p style="margin:0 0 1rem">${p}</p>`).join("");
+
+      document.getElementById("bs-skills").innerHTML = generatedData.skills.map(s => `
+        <div class="bs-skill">
+          <span class="bs-skill-icon">${s.icon}</span>
+          <div>
+            <div class="bs-skill-name">${s.name}</div>
+            <div class="bs-skill-desc">${s.desc}</div>
+          </div>
+        </div>`).join("");
+    }
+
+    window.confirmAndProceed = async function() {
+      // Import Firebase
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getDatabase, ref, update } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+
+      const FB = {
+        apiKey: "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
+        authDomain: "dungeon-crawler-geriatrics.firebaseapp.com",
+        databaseURL: "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
+        projectId: "dungeon-crawler-geriatrics",
+        storageBucket: "dungeon-crawler-geriatrics.firebasestorage.app",
+        messagingSenderId: "967017118838",
+        appId: "1:967017118838:web:fd4497925ca83bfb34b357"
+      };
+
+      const db = getDatabase(initializeApp(FB, "quiz-app"));
+
+      // Save backstory, answers, and skills to Firebase
+      const skillsObj = {};
+      generatedData.skills.forEach(s => {
+        const key = s.name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+        skillsObj[key] = { ...s, earnedAt: Date.now() };
+      });
+
+      const answerSummary = QUESTIONS.map(q => `${q.text}: ${answers[q.id]||"—"}`).join("\n");
+
+      await update(ref(db, `rooms/${roomCode}/players/${me.id}`), {
+        backstory: generatedData.backstory,
+        quizAnswers: answerSummary,
+        skills: skillsObj,
+        quizDone: true
+      });
+
+      // Also save backstory to waiting room display
+      await update(ref(db, `rooms/${roomCode}/backstories/${me.id}`), {
+        name: me.name,
+        backstory: generatedData.backstory,
+        skills: generatedData.skills
+      });
+
+      window.location.href = `waiting.html?room=${roomCode}`;
+    };
+
+    renderQuestion();
+  </script>
+</body>
+</html>
