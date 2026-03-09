@@ -172,6 +172,13 @@
     // Mark online
     update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true });
 
+    // If I haven't done the quiz yet, send me back
+    onValue(ref(db, `rooms/${roomCode}/players/${me.id}`), snap => {
+      if (snap.exists() && !snap.val().quizDone) {
+        window.location.href = `quiz.html?room=${roomCode}`;
+      }
+    }, { onlyOnce: true });
+
     window.copyCode = function() {
       navigator.clipboard?.writeText(roomCode);
       const el = document.getElementById("wr-room-code");
