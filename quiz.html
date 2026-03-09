@@ -628,28 +628,30 @@
       const playerName = me.name;
       const answerBlock = QUESTIONS.map(q => `${q.text}\n→ ${answers[q.id] || "(skipped)"}`).join("\n\n");
 
-      const prompt = `You are the sardonic System AI from a LitRPG dungeon. You have just received the Character Assessment responses for ${playerName}, who has been involuntarily drafted into a dungeon instance.
+      const prompt = `You are the sardonic, gleefully unhinged System AI that has just abducted ${playerName} into a dungeon. You have their assessment data. Now produce their official dossier.
 
-Based on these answers, write:
+RULES FOR THE BACKSTORY:
+- Take their real answers and WILDLY embellish, exaggerate, and reframe them into something absurd and funny
+- If they say "I manage marketing for a car detailing company" the System sees "a propaganda architect who spent years manipulating public perception of vehicular hygiene, engineering campaigns to make civilians feel shame about dirty cars"
+- If they mention a hobby, that hobby has secretly been dungeon training all along and they never knew it
+- The System is condescending, omniscient, and finds humans baffling and faintly tragic
+- Include specific absurd invented details: fake statistics, ridiculous titles, meaningless certifications, dubious achievements
+- Every mundane life choice becomes ominous foreshadowing
+- End with the exact moment they were taken — mid-sentence, mid-snack, mid-completely-irrelevant-thought
+- Tone: nature documentary narrator crossed with supervillain crossed with an HR department that has given up entirely
+- DO NOT use their job title or description literally. Reframe everything through a dramatic, unhinged lens.
+- Length: 4 meaty paragraphs, ~300 words. Go big. Be weird. Be funny.
 
-1. A BACKSTORY (3-4 paragraphs, ~250 words): An absurdly specific, funny, and slightly tragic biography of ${playerName}. Reference their actual answers directly. Make it feel like an official System dossier — clinical tone that slowly gets funnier. Include their mundane life before the dungeon. End with the moment the System grabbed them.
+RULES FOR THE SKILLS:
+- Each skill must be directly traceable to something specific and absurd in their answers
+- Name them like D&D abilities but make them deeply personal to this person
+- The description should sound like the System is mildly horrified this counts as a skill
+- Right energy examples: "Aggressive Mediocrity Aura", "The Audacity (Passive)", "Parking Lot Wisdom", "Corporate Trauma Response", "Stress-Induced Clairvoyance", "Weaponized Snack Knowledge"
 
-2. SKILLS (exactly 3 starting skills): Based on their life experience, invent 3 starting skills. Each should be:
-- Genuinely derived from something in their answers
-- Funny but plausibly useful in a dungeon
-- Named like a D&D ability (e.g. "Passive-Aggressive Aura", "Corporate Survival Instinct")
+Respond ONLY in this exact JSON format, no markdown, no preamble, no other text:
+{"backstory":"...","skills":[{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"}]}
 
-Respond ONLY in this exact JSON format, no other text:
-{
-  "backstory": "...",
-  "skills": [
-    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"},
-    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"},
-    {"name": "Skill Name", "desc": "One sentence description.", "icon": "emoji"}
-  ]
-}
-
-ASSESSMENT ANSWERS:
+ASSESSMENT DATA FOR ${playerName}:
 ${answerBlock}`;
 
       try {
