@@ -6,6 +6,94 @@
 <title>Dungeon Crawler Geriatrics — Active Instance</title>
 <link rel="stylesheet" href="css/global.css">
 <link rel="stylesheet" href="css/game.css">
+<style>
+    /* ── PM Tabs ── */
+    .pm-tabs {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--sys-border);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .pm-tabs::-webkit-scrollbar { display: none; }
+    .pm-tab {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      padding: 0.5rem 0.65rem;
+      color: var(--sys-text-dim);
+      cursor: pointer;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      outline: none;
+      white-space: nowrap;
+      position: relative;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .pm-tab:hover { color: var(--sys-text); }
+    .pm-tab.active { color: var(--sys-purple); border-bottom-color: var(--sys-purple); }
+    .pm-tab.player-tab.active { color: var(--sys-glow); border-bottom-color: var(--sys-glow); }
+    .pm-unread {
+      display: none;
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--sys-red);
+      box-shadow: 0 0 4px rgba(255,51,85,0.8);
+    }
+    .pm-unread.visible { display: block; }
+
+    .pm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .pm-channel { display: none; flex-direction: column; flex: 1; min-height: 0; }
+    .pm-channel.active { display: flex; }
+
+    .pm-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-height: 0;
+      max-height: calc(100vh - 380px);
+    }
+
+    .pm-input-zone {
+      padding: 0.6rem 0.75rem;
+      border-top: 1px solid var(--sys-border);
+      background: rgba(155,109,255,0.03);
+      flex-shrink: 0;
+    }
+    .pm-input-zone.player-zone { background: rgba(0,212,255,0.03); }
+    .pm-input-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      color: var(--sys-purple);
+      margin-bottom: 0.35rem;
+    }
+    .pm-input-label.player-label { color: var(--sys-glow-dim); }
+    .pm-send-btn {
+      width: 100%;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      padding: 0.4rem;
+      border: 1px solid var(--sys-purple);
+      background: transparent;
+      color: var(--sys-purple);
+      cursor: pointer;
+      margin-top: 0.4rem;
+      transition: all 0.15s;
+      outline: none;
+    }
+    .pm-send-btn:hover { background: rgba(155,109,255,0.08); box-shadow: 0 0 10px rgba(155,109,255,0.2); }
+    .pm-send-btn.player-send { border-color: var(--sys-glow-dim); color: var(--sys-glow); }
+    .pm-send-btn.player-send:hover { background: rgba(0,212,255,0.06); box-shadow: 0 0 10px rgba(0,212,255,0.2); }
+</style>
 </head>
 <body class="game-page">
 
@@ -91,32 +179,40 @@
       </div>
     </main>
 
-    <!-- RIGHT: Private DM channel -->
+    <!-- RIGHT: Tabbed private messaging -->
     <aside class="panel panel-right">
 
-      <div class="private-header">
-        <div class="private-title">🔮 PRIVATE CHANNEL</div>
-        <div class="private-subtitle">Only you and the DM can see this</div>
-      </div>
-
-      <div class="private-log" id="private-log">
-        <div class="private-empty">
-          NO PRIVATE TRANSMISSIONS<br><br>
-          Whisper something to the DM.<br>
-          Your party won't hear a thing.<br><br>
-          <span style="color:var(--sys-text-faint);font-size:.55rem;">Secrets have consequences.</span>
-        </div>
-      </div>
-
-      <div class="private-input-zone">
-        <div class="private-input-label">// WHISPER TO DM (PRIVATE)</div>
-        <textarea class="private-textarea" id="private-input"
-          placeholder="Psst... DM. Don't tell the others but..."
-          onkeydown="handlePrivateKey(event)"
-          rows="3"></textarea>
-        <button class="btn btn-block" style="border-color:var(--sys-purple);color:var(--sys-purple);font-size:.7rem;padding:.45rem;" onclick="sendPrivateAction()">
-          🔮 SEND PRIVATELY
+      <!-- Tab bar -->
+      <div class="pm-tabs" id="pm-tabs">
+        <button class="pm-tab active" id="pm-tab-dm" onclick="switchPmTab("dm")">
+          🔮 DM
+          <span class="pm-unread" id="pm-unread-dm"></span>
         </button>
+        <!-- Player tabs injected here by JS -->
+      </div>
+
+      <!-- Tab content area -->
+      <div class="pm-body" id="pm-body">
+        <!-- DM channel (default) -->
+        <div class="pm-channel" id="pm-channel-dm">
+          <div class="pm-log" id="private-log">
+            <div class="private-empty">
+              NO PRIVATE TRANSMISSIONS<br><br>
+              Whisper something to the DM.<br>
+              Your party won't hear a thing.<br><br>
+              <span style="color:var(--sys-text-faint);font-size:.55rem;">Secrets have consequences.</span>
+            </div>
+          </div>
+          <div class="pm-input-zone">
+            <div class="pm-input-label">// WHISPER TO DM</div>
+            <textarea class="private-textarea" id="private-input"
+              placeholder="Psst... DM. Don't tell the others but..."
+              onkeydown="handlePrivateKey(event)"
+              rows="2"></textarea>
+            <button class="pm-send-btn" onclick="sendPrivateAction()">🔮 SEND TO DM</button>
+          </div>
+        </div>
+        <!-- Player channels injected by JS -->
       </div>
 
       <div class="depth-section">
@@ -130,7 +226,6 @@
         </div>
       </div>
 
-      <!-- Session info -->
       <div style="padding:.75rem;border-top:1px solid var(--sys-border);margin-top:auto;flex-shrink:0;">
         <div class="panel-hd">// SESSION</div>
         <div style="display:flex;flex-direction:column;gap:.3rem;">
@@ -211,6 +306,8 @@
       renderTurnBar();
       renderDepth();
       renderPips();
+      renderPlayerTabs();
+      syncPlayerPms();
       syncGroupLog(roomData.log||{});
 
       // Load private history from my player data
@@ -654,6 +751,134 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
     }
 
     function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
+
+
+    // ── PM Tab System ──────────────────────────────────────
+    let activePmTab = "dm";
+    let pmUnreadCounts = {};
+    let renderedPmKeys = {}; // { playerId: Set }
+    let playerTabsRendered = new Set();
+
+    window.switchPmTab = function(tabId) {
+      activePmTab = tabId;
+      document.querySelectorAll(".pm-tab").forEach(t => t.classList.remove("active"));
+      document.querySelectorAll(".pm-channel").forEach(c => c.classList.remove("active"));
+      const tab = document.getElementById(`pm-tab-${tabId}`);
+      const channel = document.getElementById(`pm-channel-${tabId}`);
+      if (tab) tab.classList.add("active");
+      if (channel) channel.classList.add("active");
+      // Clear unread
+      pmUnreadCounts[tabId] = 0;
+      const dot = document.getElementById(`pm-unread-${tabId}`);
+      if (dot) dot.classList.remove("visible");
+    };
+
+    function renderPlayerTabs() {
+      const tabBar  = document.getElementById("pm-tabs");
+      const pmBody  = document.getElementById("pm-body");
+      const AVATARS = ["◈","◉","◊","○"];
+
+      players.forEach((p, i) => {
+        if (p.id === me.id) return; // skip yourself
+        if (playerTabsRendered.has(p.id)) return;
+        playerTabsRendered.add(p.id);
+        if (!renderedPmKeys[p.id]) renderedPmKeys[p.id] = new Set();
+
+        // Tab button
+        const tab = document.createElement("button");
+        tab.className = "pm-tab player-tab";
+        tab.id = `pm-tab-${p.id}`;
+        tab.onclick = () => window.switchPmTab(p.id);
+        tab.innerHTML = `${AVATARS[i]} ${p.name.split(" ")[0]}<span class="pm-unread" id="pm-unread-${p.id}"></span>`;
+        tabBar.appendChild(tab);
+
+        // Channel div
+        const channel = document.createElement("div");
+        channel.className = "pm-channel";
+        channel.id = `pm-channel-${p.id}`;
+        channel.innerHTML = `
+          <div class="pm-log" id="pm-log-${p.id}">
+            <div class="private-empty" id="pm-empty-${p.id}">
+              NO MESSAGES YET<br><br>
+              Only ${p.name} can see this.<br><br>
+              <span style="color:var(--sys-text-faint);font-size:.55rem;">Keep your secrets close.</span>
+            </div>
+          </div>
+          <div class="pm-input-zone player-zone">
+            <div class="pm-input-label player-label">// PRIVATE MESSAGE TO ${p.name.toUpperCase()}</div>
+            <textarea class="private-textarea" id="pm-input-${p.id}"
+              placeholder="Only ${p.name} will see this..."
+              onkeydown="handlePlayerPmKey(event, '${p.id}')"
+              rows="2"></textarea>
+            <button class="pm-send-btn player-send" onclick="sendPlayerPm('${p.id}')">
+              ◈ SEND TO ${p.name.toUpperCase().split(" ")[0]}
+            </button>
+          </div>`;
+        pmBody.appendChild(channel);
+      });
+    }
+
+    function syncPlayerPms() {
+      players.forEach(p => {
+        if (p.id === me.id) return;
+        if (!renderedPmKeys[p.id]) renderedPmKeys[p.id] = new Set();
+
+        // PM key is always sorted so both players share same node
+        const pmKey = [me.id, p.id].sort().join("_");
+        const pmLog = roomData.pms?.[pmKey] || {};
+
+        Object.entries(pmLog).sort(([,a],[,b])=>(a.ts||0)-(b.ts||0)).forEach(([key, entry]) => {
+          if (renderedPmKeys[p.id].has(key)) return;
+          renderedPmKeys[p.id].add(key);
+
+          // Remove empty placeholder
+          document.getElementById(`pm-empty-${p.id}`)?.remove();
+
+          const log = document.getElementById(`pm-log-${p.id}`);
+          if (!log) return;
+
+          const isFromMe = entry.fromId === me.id;
+          const div = document.createElement("div");
+          div.className = `private-entry ${isFromMe ? "from-me" : "from-dm"}`;
+          div.innerHTML = `
+            <div class="pe-who">${isFromMe ? "🔒 YOU" : `◈ ${entry.fromName}`}</div>
+            <div class="pe-body">${entry.text}</div>`;
+          log.appendChild(div);
+          log.scrollTop = log.scrollHeight;
+
+          // Unread dot if tab not active
+          if (!isFromMe && activePmTab !== p.id) {
+            pmUnreadCounts[p.id] = (pmUnreadCounts[p.id] || 0) + 1;
+            const dot = document.getElementById(`pm-unread-${p.id}`);
+            if (dot) dot.classList.add("visible");
+          }
+        });
+      });
+    }
+
+    window.sendPlayerPm = async function(targetId) {
+      const input = document.getElementById(`pm-input-${targetId}`);
+      const text  = input?.value.trim();
+      if (!text) return;
+      input.value = "";
+
+      const target = players.find(p => p.id === targetId);
+      const pmKey  = [me.id, targetId].sort().join("_");
+      const msgKey = `${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+
+      await set(ref(db, `rooms/${roomCode}/pms/${pmKey}/${msgKey}`), {
+        fromId:   me.id,
+        fromName: myPlayer?.name || me.name,
+        toId:     targetId,
+        toName:   target?.name || "Player",
+        text,
+        ts: Date.now()
+      });
+    };
+
+    window.handlePlayerPmKey = function(e, targetId) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); window.sendPlayerPm(targetId); }
+    };
 
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
