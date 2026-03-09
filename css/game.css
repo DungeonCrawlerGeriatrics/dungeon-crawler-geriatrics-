@@ -163,13 +163,22 @@
   position: absolute;
   top: -1px; right: 8px;
   font-family: 'Share Tech Mono', monospace;
-  font-size: 0.5rem;
-  letter-spacing: 0.15em;
-  color: var(--sys-glow);
-  background: var(--sys-bg);
-  padding: 0 0.4rem;
-  border: 1px solid var(--sys-glow-dim);
+  font-size: 0.55rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: #ff2a2a;
+  background: #1a0000;
+  padding: 0 0.5rem;
+  border: 1px solid #ff2a2a;
   border-top: none;
+  text-shadow: 0 0 8px #ff2a2a, 0 0 16px #ff000099;
+  box-shadow: 0 0 8px #ff2a2a44, inset 0 0 6px #ff000022;
+  animation: acting-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes acting-pulse {
+  0%, 100% { box-shadow: 0 0 8px #ff2a2a44, inset 0 0 6px #ff000022; text-shadow: 0 0 8px #ff2a2a, 0 0 16px #ff000099; }
+  50%       { box-shadow: 0 0 18px #ff2a2a99, inset 0 0 10px #ff000044; text-shadow: 0 0 12px #ff4444, 0 0 24px #ff0000cc; }
 }
 
 .stat-row {
