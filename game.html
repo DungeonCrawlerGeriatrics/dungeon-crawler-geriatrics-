@@ -215,7 +215,7 @@
     .dice-fab {
       position: fixed;
       bottom: 5.5rem;
-      right: 1.2rem;
+      left: 1.2rem;
       width: 48px; height: 48px;
       border-radius: 50%;
       border: 1px solid var(--sys-gold-dim);
@@ -236,8 +236,8 @@
       inset: 0;
       z-index: 600;
       align-items: flex-end;
-      justify-content: flex-end;
-      padding: 1rem 1.2rem 6rem 1.2rem;
+      justify-content: flex-start;
+      padding: 1rem 1rem 6rem 1.2rem;
       pointer-events: none;
     }
     .dice-overlay.open { display: flex; }
@@ -355,6 +355,41 @@
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.58rem; color: var(--sys-text-faint); letter-spacing: 0.15em;
       margin-top: 0.25rem;
+    }
+</style>
+<style>
+    .dice-stat-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .stat-die-btn {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.52rem;
+      letter-spacing: 0.03em;
+      padding: 0.35rem 0.1rem;
+      border: 1px solid var(--sys-border);
+      background: transparent;
+      color: var(--sys-text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+      outline: none;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .stat-die-btn:hover  { border-color: var(--sys-gold); color: var(--sys-gold); background: rgba(255,204,68,0.05); }
+    .stat-die-btn.active { border-color: var(--sys-gold); color: var(--sys-gold); background: rgba(255,204,68,0.08); }
+    .stat-die-val { font-size: 0.72rem; display: block; color: var(--sys-text); }
+    .dice-tray-divider {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.52rem;
+      color: var(--sys-text-faint);
+      letter-spacing: 0.2em;
+      text-align: center;
+      margin: 0.4rem 0;
+      border-top: 1px solid var(--sys-border);
+      padding-top: 0.4rem;
     }
 </style>
 </head>
@@ -1398,6 +1433,32 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
     window.toggleDiceTray = function() {
       const overlay = document.getElementById('dice-overlay');
       overlay.classList.toggle('open');
+      if (overlay.classList.contains('open')) populateStatRow();
+    };
+
+    let selectedStat = null;
+    const STAT_KEYS = ["STR","DEX","CON","INT","WIS","CHA"];
+
+    function populateStatRow() {
+      const row = document.getElementById('stat-die-row');
+      if (!row) return;
+      const stats = myPlayer?.stats || {};
+      row.innerHTML = STAT_KEYS.map(k => {
+        const v = parseInt(stats[k]) || 0;
+        const mod = v ? Math.floor((v - 10) / 2) : 0;
+        const modStr = v ? (mod >= 0 ? '+' + mod : '' + mod) : '?';
+        return `<button class="stat-die-btn ${selectedStat===k?'active':''}"
+          onclick="selectStat('${k}', ${mod})"
+          title="${k}: ${v} (mod ${modStr})">
+          ${k}<span class="stat-die-val">${modStr}</span>
+        </button>`;
+      }).join('');
+    }
+
+    window.selectStat = function(key, mod) {
+      selectedStat = selectedStat === key ? null : key;
+      document.getElementById('dice-mod').value = selectedStat ? mod : 0;
+      populateStatRow();
     };
 
     window.setVisibility = function(v) {
@@ -1530,6 +1591,11 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
         <button class="die-btn" onclick="rollDie(10, this)">d10</button>
         <button class="die-btn" onclick="rollDie(12, this)">d12</button>
         <button class="die-btn" onclick="rollDie(20, this)" id="d20-btn">d20</button>
+      </div>
+
+      <div class="dice-tray-divider">// ROLL WITH STAT MOD</div>
+      <div class="dice-stat-row" id="stat-die-row">
+        <!-- populated by JS -->
       </div>
 
       <div class="dice-modifier">
