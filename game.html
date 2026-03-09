@@ -504,7 +504,7 @@
       isDMThinking=true; setTyping(true); renderTurnBar();
 
       const party = players.map(p=>`- ${p.name} (${statLine(p)})`).join("\n");
-      const openMsg = `DUNGEON INSTANCE INITIALIZED.\n\nThe friends:\n${party}\n\nThey were just hanging out — maybe a game night, watching something, having drinks. Then the System activated without warning. Their living room is now the entry chamber of a dungeon. Some of their stuff came with them.\n\nBegin. Describe the sudden transition — the terror and confusion of the System activation. Introduce the in-world System UI notification floating in their vision. Make it funny AND genuinely alarming. End with their immediate situation. Do NOT offer A/B/C choices — just describe what they face and let them decide freely.`;
+      const openMsg = `DUNGEON INSTANCE INITIALIZED.\n\nThe friends:\n${party}\n\nThey were just hanging out — maybe a game night, watching something, having drinks. Then the System activated without warning. Their living room is now the entry chamber of a dungeon. Some of their stuff came with them.\n\nBegin. Describe the sudden transition — the terror and confusion of the System activation. Introduce the in-world System UI notification floating in their vision. Make it funny AND genuinely alarming. Drop them into the moment mid-breath. Do NOT offer choices. Do NOT ask what they do. Just stop. Let the silence do the work.`;
 
       const dmText = await callClaude(buildSysPrompt(), openMsg, []);
       aiHistory = [{role:"user",content:openMsg},{role:"assistant",content:dmText}];
@@ -734,7 +734,12 @@ MECHANICS:
 - [Name heals X HP! HP: XX/XX]  
 - [SYSTEM: New skill acquired — Skill Name]
 - [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-- Keep responses 150-250 words. End with an open situation — NEVER offer A/B/C options or numbered choices. Players have free will. Just paint the scene and let them decide.
+- Keep responses 150-250 words.
+- End EVERY response mid-scene. The world is in motion. Something is happening. Stop there.
+- NEVER end with a question. NEVER end with "What do you do?". NEVER summarize options.
+- NEVER write "You could..." or "Perhaps..." or "There are three paths..."
+- DO NOT hint at what players might want to do next. They know their characters. Trust them.
+- You are a narrator, not a game show host. Paint the world. Shut up. Wait.
 - Pets CAN be found and adopted — make this special.
 - The dungeon has 5 levels. Final boss has back problems too.`;
     }
