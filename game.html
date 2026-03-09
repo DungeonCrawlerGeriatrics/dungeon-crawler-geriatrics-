@@ -1121,8 +1121,21 @@ OPENING SCENE RULES — follow these exactly:
       if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
 
       const actor  = players[turnIndex];
-      const pStatus = players.map(p=>{ const inv=Object.values(p.inventory||{}).map(i=>i.name).join(",") || "nothing"; return `${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""} Class:${p.heroClass||"???"} Inv:[${inv}]`; }).join(" | ");
-      const msg = `[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]\n${actor?.name} acts: "${text}"\nParty: ${pStatus}\n\nNarrate result. Use [SYSTEM: text] for system notifications, {LOOT: item description} for items found. Track class-revealing behavior — if this action strongly suggests a class archetype, NOW is when you might dramatically reveal it with [SYSTEM: CLASS ASSIGNMENT — name is now a ClassName!]. Use [brackets] for all mechanics.`;
+      const actorInv = Object.values(actor?.inventory||{}).map(i=>`"${i.name}"`).join(", ") || "nothing";
+      const actorSkills = Object.values(actor?.skills||{}).map(s=>s.name).join(", ") || "none";
+      const pStatus = players.map(p => {
+        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
+        const fallen = (p.hp??1)<=0 ? " [FALLEN]" : "";
+        return `${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${fallen} Class:${p.heroClass||"???"}`;
+      }).join(" | ");
+      const msg = `[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]
+ACTING PLAYER: ${actor?.name} (HP:${actor?.hp??actor?.maxHp}/${actor?.maxHp} | Class:${actor?.heroClass||"UNASSIGNED"})
+  Inventory: [${actorInv}]
+  Skills: ${actorSkills}
+  Action: "${text}"
+Party status: ${pStatus}
+
+Narrate the result. System prompt has full party details. {LOOT: name — desc} for new items. {TRANSFER: name — from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] if behavior warrants it.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
@@ -1425,104 +1438,100 @@ OPENING SCENE RULES — follow these exactly:
 
     // ── System prompts ───────────────────────────────────────
     function buildSysPrompt() {
-      const partyDesc = players.map(p=>{
-        const inv = Object.values(p.inventory||{});
+      const partyDesc = players.map(p => {
+        const s       = p.stats || {};
+        const statStr = Object.entries(s).map(([k,v]) => {
+          const mod = Math.floor((parseInt(v)-10)/2);
+          return `${k}:${v}(${mod>=0?'+'+mod:mod})`;
+        }).join(" ");
+        const inv     = Object.values(p.inventory||{});
         const invList = inv.length
-          ? inv.map(i => `${i.name}${i.desc ? ` (${i.desc})` : ''}`).join(", ")
-          : "nothing";
-        const notes = p.id === me.id ? "" : (p.notes ? ` | Notes (DM-visible): "${p.notes}"` : "");
-        const backstory = p.backstory ? `\n  Backstory: ${p.backstory.slice(0,300)}...` : "";
-        const skills = Object.values(p.skills||{}).map(s=>s.name).join(", ");
-        const skillStr = skills ? ` | Skills: ${skills}` : "";
-        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | INVENTORY: [${invList}]${skillStr}${notes}${backstory}`;
-      }).join("\n");
+          ? inv.map(i => `"${i.name}"${i.desc ? ` — ${i.desc}` : ''}`).join("; ")
+          : "empty";
+        const skills  = Object.values(p.skills||{});
+        const skillStr = skills.length
+          ? skills.map(s => `${s.name}${s.desc ? ` (${s.desc})` : ''}`).join("; ")
+          : "none";
+        const statuses = (p.statuses||[]).length ? `Conditions: ${p.statuses.join(", ")}` : "";
+        const notes    = p.notes ? `Private notes (DM eyes only): "${p.notes}"` : "";
+        const backstory = p.backstory ? `Backstory: ${p.backstory.slice(0,400)}` : "";
+        const quizAnswers = p.quizAnswers ? `Quiz answers: ${p.quizAnswers.slice(0,300)}` : "";
+        return [
+          `[ ${p.heroEmoji||"?"} ${p.name}${p.heroName ? ` aka "${p.heroName}"` : ""} ]`,
+          `  Class: ${p.heroClass||"UNASSIGNED"} | HP: ${p.hp??p.maxHp}/${p.maxHp} | MP: ${p.mp??p.maxMp??0}/${p.maxMp??0}`,
+          `  Stats: ${statStr||"unknown"}`,
+          `  Inventory: [${invList}]`,
+          `  Skills: ${skillStr}`,
+          statuses,
+          notes,
+          backstory,
+          quizAnswers
+        ].filter(Boolean).join("\n");
+      }).join("\n\n");
       return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
 
 LORE: A mysterious System activated mid-evening without warning, pulling a group of friends from their living room into a dungeon. Nobody consented. The System is watching everything and assigns classes based on behavior — players don't choose their class, they EARN it through actions.
 
+CURRENT STATE:
+Location: ${roomData?.location||"Entry Chamber"} | Depth: ${depth}/5 | Turn: ${turnCount+1} | Round: ${roundCount}
+Active player this turn: ${players[turnIndex]?.name||"unknown"}
+
 THE PARTY (${players.length} survivors):
 ${partyDesc}
-Location: ${roomData?.location||"Unknown"} | Depth: ${depth}
+
+INVENTORY IS AUTHORITATIVE: The inventory lists above are the only items that exist. Never reference, imply, or invent items not listed. To give an item: {LOOT: name — desc}. To move an item: {TRANSFER: EXACT name — from:Name to:Name}.
+NOTES ARE PRIVATE: Player notes are visible to you (DM) only — never reveal their contents publicly or to other players.
 
 TONE & STYLE:
-- Dark fantasy mixed with middle-aged mundane humor (Dungeon Crawler Carl vibes)
-- The System communicates via floating notifications: use [SYSTEM: message] for these
-- Loot has absurd flavor text: use {LOOT: item name — ridiculous description}
-- NPCs are aware they're in a "dungeon instance" — some treat it like a TV show
-- Stats are genuinely bad because these are regular people
+- Dark fantasy + middle-aged mundane humor (Dungeon Crawler Carl vibes)
+- System notifications float in players' vision: [SYSTEM: message]
+- Loot has absurd flavor: {LOOT: item name — ridiculous description}
+- NPCs treat the dungeon like a TV show they're on
+- Stats are genuinely terrible — these are regular people
 - Class reveals are DRAMATIC: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
 
-CRITICAL RULE — PLAYER AUTONOMY:
-NEVER write player dialogue, thoughts, internal monologue, or actions beyond what they explicitly told you.
-Players speak for themselves. You narrate the world's reaction to what they do.
-BAD: "Dave says 'we should check the left passage' and nervously adjusts his shirt"
-GOOD: The left passage exhales cold air. Something scrapes stone in the dark.
-You control: the world, monsters, NPCs, environment, consequences, loot, System notifications.
-You do NOT control: what players say, think, feel, or decide to do next.
-End every response with the world waiting — not with the players reacting to it.
+CRITICAL — PLAYER AUTONOMY:
+NEVER write player dialogue, thoughts, or actions. Players speak for themselves.
+You control: world, monsters, NPCs, environment, consequences, loot, System notifications.
+End every response with the world mid-motion — not with players reacting.
 
-CRITICAL RULE — INVENTORY INTEGRITY:
-The INVENTORY lists above are the single source of truth. ONLY reference items that appear there.
-NEVER invent items a player is carrying — no phantom journals, no imaginary coins, no made-up weapons.
-If you want a player to HAVE something, give it to them explicitly with {LOOT: item — desc} so it saves.
-If an item moves between players: {TRANSFER: EXACT_ITEM_NAME — from:SenderFirstName to:ReceiverFirstName}. Use the item's EXACT name from the inventory list. One tag per item.
-Referencing items that don't exist in the inventory list breaks immersion and player trust.
-
-CLASS TRACKING (secret — don't tell players):
-Watch behavior patterns. After 4-6 actions showing clear tendency, assign a class dramatically.
-Available classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker
-Wildcard classes possible for unusual behavior.
+CLASS TRACKING (secret):
+Watch behavior. After 4-6 actions showing clear tendency, assign dramatically.
+Classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker + wildcards.
 
 MECHANICS:
-- [Name takes X damage! HP: XX/XX]
-- [Name heals X HP! HP: XX/XX]  
-- [SYSTEM: New skill acquired — Skill Name]
+- [Name takes X damage! HP: current/max]
+- [Name heals X HP! HP: current/max]
+- [SYSTEM: New skill acquired — SkillName: desc]
 - [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-- {TRANSFER: EXACT item name from inventory — from:SenderName to:ReceiverName} — one tag per item, exact name match required, removes from sender and adds to receiver automatically.
-- Keep responses 150-250 words.
-- End EVERY response mid-scene. The world is in motion. Something is happening. Stop there.
-- NEVER end with a question. NEVER end with "What do you do?". NEVER summarize options.
-- NEVER write "You could..." or "Perhaps..." or "There are three paths..."
-- DO NOT hint at what players might want to do next. They know their characters. Trust them.
-- You are a narrator, not a game show host. Paint the world. Shut up. Wait.
+- Keep responses 150-250 words. End EVERY response mid-scene.
+- NEVER end with a question, choices, or "What do you do?"
+- NEVER write "You could..." or list options. Paint the world. Shut up. Wait.
 
-DICE & OUTCOMES:
-Players have a physical dice tray. When an action has uncertain, risky, or dramatic outcomes, DEMAND a roll before narrating the result. Do not auto-resolve things that should be decided by dice.
+DICE:
+Call rolls when outcomes are uncertain. Name the player first:
+  Duggs, [ROLL: d20+STR — to force the door]
+  Shabadoo, [ROLL: d20+DEX — to dodge]
+Call the roll then STOP — do not narrate outcome until player posts result.
+Roll outcomes: 1=disaster, 2-5=fail+consequences, 6-10=fail, 11-15=partial, 16-19=success, 20+=exceptional, nat20=legendary, nat1=spectacular disaster.
+Don't roll for: looking around, talking, walking somewhere safe.
 
-Call for rolls like this — ALWAYS say the player's name immediately before the tag so the system knows who must roll:
-  Duggs, [ROLL: d20+STR — to force the rusted door]
-  Shabadoo, [ROLL: d20+DEX — to dodge the falling debris]
-  [PlayerName], [ROLL: d20+CHA — to convince the goblin you're their supervisor]
-  [PlayerName], [ROLL: d20+INT — to recall dungeon architecture]
-  [PlayerName], [ROLL: d20 — pure luck, no stat applies]
-
-The player's name MUST appear directly before the [ROLL:] tag every time — this is how the system routes the dice roll to the correct player's screen.
-
-When you call for a roll, STOP. Do not narrate what happens yet. Wait for the player to post their result.
-When the player posts a number, narrate based on that number:
-  1        = catastrophic failure, something goes hilariously/horribly wrong
-  2-5      = failure with consequences
-  6-10     = failure, but nothing makes it worse
-  11-15    = partial success, something costs them
-  16-19    = clean success
-  20+      = exceptional success, something extra good happens
-  Nat 20   = legendary moment, go big
-  Nat 1    = spectacular disaster, go big in the worst way
-
-NOT every action needs a roll. Don't roll for: looking around, talking normally, walking somewhere safe, picking up an item. DO roll for: combat, risky movement, persuasion of hostile NPCs, anything that could meaningfully fail.
-- Pets CAN be found and adopted — make this special.
-- The dungeon has 5 levels. Final boss has back problems too.`;
+- Pets CAN be found and adopted — make it special.
+- The dungeon has 5 levels. The final boss has back problems too.`;
     }
 
     function buildPrivateSysPrompt() {
       const partyDesc = players.map(p => {
-        const inv = Object.values(p.inventory||{});
+        const inv    = Object.values(p.inventory||{});
         const invList = inv.length
-          ? inv.map(i => `${i.name}${i.desc ? ` (${i.desc})` : ''}`).join(", ")
-          : "nothing";
-        const skills  = Object.values(p.skills||{}).map(s=>s.name).join(", ") || "none";
-        return `- ${p.name}: Class ${p.heroClass||"???"}, HP ${p.hp??p.maxHp}/${p.maxHp}\n  INVENTORY: ${invList}\n  SKILLS: ${skills}`;
-      }).join("\n");
+          ? inv.map(i => `"${i.name}"${i.desc ? ` — ${i.desc}` : ''}`).join("; ")
+          : "empty";
+        const skills = Object.values(p.skills||{}).map(s => `${s.name}${s.desc?' ('+s.desc+')':''}`).join("; ") || "none";
+        const notes  = p.notes ? `\n  Private notes: "${p.notes}"` : "";
+        const s      = p.stats||{};
+        const statStr = Object.entries(s).map(([k,v])=>`${k}:${v}`).join(" ");
+        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"???"} | ${statStr}\n  Inventory: [${invList}]\n  Skills: ${skills}${notes}`;
+      }).join("\n\n");
 
       return `You are the DM for Dungeon Crawler Geriatrics. A player is whispering to you PRIVATELY.
 
