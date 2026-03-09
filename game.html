@@ -742,7 +742,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update, push }
+    import { getDatabase, ref, set, get, onValue, update, push, remove }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
     const FB = {
@@ -823,6 +823,16 @@
 
       // Load storyLedger
       if (roomData.storyLedger) storyLedger = roomData.storyLedger;
+
+      // Check for a pending roll addressed to ME — activates roll blocker on non-acting players
+      const myPendingRoll = roomData.pendingRolls?.[me.id];
+      if (myPendingRoll && !pendingRoll) {
+        const age = Date.now() - (myPendingRoll.ts || 0);
+        if (age < 60000) { // ignore stale rolls older than 1 min
+          setPendingRoll(myPendingRoll.sides, myPendingRoll.stat, myPendingRoll.reason);
+          setTimeout(() => openRollFromDM(myPendingRoll.sides, myPendingRoll.stat, myPendingRoll.reason), 300);
+        }
+      }
 
       // Load private history from my player data
       syncPrivateLog(myPlayer?.privateLog||{});
@@ -1243,37 +1253,58 @@ Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name — desc} 
       const trayTitle = document.querySelector('.dice-title');
       if (trayTitle) trayTitle.textContent = '🎲 DICE TRAY';
       document.querySelectorAll('.die-btn').forEach(btn => btn.classList.remove('active-die'));
+      // Clear from Firebase so it doesn't re-trigger on next onValue
+      remove(ref(db, `rooms/${roomCode}/pendingRolls/${me.id}`));
     }
 
     function checkForPendingRoll(text) {
-      const rollMatch = text.match(/\[ROLL:\s*d(\d+)([+\-]\s*(STR|DEX|CON|INT|WIS|CHA))?\s*[—\-]?\s*([^\]]*)/i);
-      if (!rollMatch) return false;
+      // Find ALL [ROLL:] tags in the response — combat can require multiple rolls
+      const rollRegex = /\[ROLL:\s*d(\d+)([+\-]\s*(STR|DEX|CON|INT|WIS|CHA))?\s*[—\-]?\s*([^\]]*)\]/gi;
+      const rolls = [];
+      let m;
+      while ((m = rollRegex.exec(text)) !== null) {
+        const sides  = m[1] || '20';
+        const stat   = m[3] ? m[3].toUpperCase() : '';
+        const reason = (m[4] || '').trim();
+        const rollPos = m.index;
 
-      const sides  = rollMatch[1] || '20';
-      const stat   = rollMatch[3] ? rollMatch[3].toUpperCase() : '';
-      const reason = (rollMatch[4] || '').trim();
-
-      // Try to figure out WHO the roll is for:
-      // 1. Look for a player name mentioned in the ~60 chars before the [ROLL: tag
-      const rollIdx = text.search(/\[ROLL:/i);
-      const nearby  = rollIdx > 0 ? text.slice(Math.max(0, rollIdx - 120), rollIdx) : '';
-      let targetPlayer = null;
-      for (const p of players) {
-        const firstName = p.name.split(' ')[0];
-        if (nearby.toLowerCase().includes(firstName.toLowerCase())) {
-          targetPlayer = p;
-          break;
+        // Find who this roll is for — look at 120 chars before the tag
+        const nearby = text.slice(Math.max(0, rollPos - 120), rollPos);
+        let targetPlayer = null;
+        for (const p of players) {
+          const firstName = p.name.split(' ')[0];
+          if (nearby.toLowerCase().includes(firstName.toLowerCase())) {
+            targetPlayer = p;
+            break;
+          }
         }
+        if (!targetPlayer) targetPlayer = players[turnIndex]; // fallback to actor
+
+        rolls.push({ sides, stat, reason, targetId: targetPlayer.id });
       }
-      // 2. Fall back to current turn actor
-      if (!targetPlayer) targetPlayer = players[turnIndex];
 
-      // Only activate blocker on MY screen if I'm the target
-      if (!targetPlayer || targetPlayer.id !== me.id) return false;
+      if (!rolls.length) return false;
 
-      setPendingRoll(sides, stat, reason);
-      setTimeout(() => openRollFromDM(sides, stat, reason), 300);
-      return true;
+      // Write ALL pending rolls to Firebase — each player's client watches for their own
+      const rollUpdates = {};
+      for (const roll of rolls) {
+        rollUpdates[`rooms/${roomCode}/pendingRolls/${roll.targetId}`] = {
+          sides: roll.sides,
+          stat:  roll.stat,
+          reason: roll.reason,
+          ts: Date.now()
+        };
+      }
+      update(ref(db), rollUpdates);
+
+      // Activate MY roll blocker if I'm in the list
+      const myRoll = rolls.find(r => r.targetId === me.id);
+      if (myRoll) {
+        setPendingRoll(myRoll.sides, myRoll.stat, myRoll.reason);
+        setTimeout(() => openRollFromDM(myRoll.sides, myRoll.stat, myRoll.reason), 300);
+      }
+
+      return rolls.length > 0;
     }
 
 
@@ -1620,9 +1651,10 @@ RULES:
 - Dungeon has 5 levels. Final boss has back problems.
 - Pets CAN be found — make it special.
 
-DICE — name player before tag:
-  Duggs, [ROLL: d20+STR — reason]
-Call roll then STOP. Wait for result before narrating outcome.
+DICE — name the player before EACH roll tag:
+  Duggs, [ROLL: d20+STR — to force the door]
+  Shabadoo, [ROLL: d20+DEX — to dodge the attack]
+In combat, call rolls for EVERY participant who needs one — attacker AND defender if both are at risk. Each player gets their own [ROLL:] tag. Call all rolls then STOP — do not narrate outcome until ALL players have posted results.
 1=disaster, 2-5=fail+consequences, 6-10=fail, 11-15=partial, 16-19=success, 20+=exceptional, nat20=legendary, nat1=spectacular disaster.
 Don't roll for: looking, talking, safe movement.`;
     }
@@ -2009,8 +2041,10 @@ Keep response under 80 words. Short. Conspiratorial.`;
         );
         if (existingNames.has(rawName.toLowerCase())) continue;
 
-        // Only write if: it's my own item, OR I am host (prevents multi-client duplication)
-        if (targetId !== me.id && !me.isHost) continue;
+        // Unnamed loot → always goes to me, I write it myself
+        // Named loot → only the acting player or host writes it (prevents every client writing the same item)
+        const isActing = players[turnIndex]?.id === me.id;
+        if (targetId !== me.id && !me.isHost && !isActing) continue;
 
         const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`;
         set(ref(db, `rooms/${roomCode}/players/${targetId}/inventory/${key}`), {
