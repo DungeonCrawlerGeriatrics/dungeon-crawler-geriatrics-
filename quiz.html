@@ -334,6 +334,16 @@
         The System requires data to properly categorize you.<br>
         <span class="warn">Answers will be used against you.</span>
       </div>
+      <div style="margin-top:1rem;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;letter-spacing:.2em;color:var(--sys-text-faint);margin-bottom:.35rem;">// SHARE THIS CODE WITH YOUR PARTY</div>
+        <div id="quiz-room-code" onclick="copyRoomCode()" title="Click to copy"
+          style="font-family:'Share Tech Mono',monospace;font-size:2rem;letter-spacing:.4em;color:var(--sys-glow);text-shadow:0 0 16px rgba(0,212,255,0.4);cursor:pointer;transition:text-shadow .2s;">
+          ????
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--sys-text-faint);letter-spacing:.15em;margin-top:.2rem;">
+          CLICK TO COPY · EVERYONE FILLS THIS OUT BEFORE THE WAITING ROOM
+        </div>
+      </div>
     </div>
 
     <!-- Progress -->
@@ -581,7 +591,19 @@
       if (!answers[QUESTIONS[current].id]) return;
       if (current < QUESTIONS.length - 1) {
         current++;
-        renderQuestion();
+        // Show room code
+    const codeEl = document.getElementById("quiz-room-code");
+    if (codeEl && roomCode) codeEl.textContent = roomCode;
+
+    window.copyRoomCode = function() {
+      navigator.clipboard?.writeText(roomCode);
+      const el = document.getElementById("quiz-room-code");
+      const orig = el.style.color;
+      el.style.color = "var(--sys-green)";
+      setTimeout(() => el.style.color = orig, 1000);
+    };
+
+    renderQuestion();
       } else {
         generateBackstory();
       }
@@ -720,6 +742,18 @@ ${answerBlock}`;
       });
 
       window.location.href = `waiting.html?room=${roomCode}`;
+    };
+
+    // Show room code
+    const codeEl = document.getElementById("quiz-room-code");
+    if (codeEl && roomCode) codeEl.textContent = roomCode;
+
+    window.copyRoomCode = function() {
+      navigator.clipboard?.writeText(roomCode);
+      const el = document.getElementById("quiz-room-code");
+      const orig = el.style.color;
+      el.style.color = "var(--sys-green)";
+      setTimeout(() => el.style.color = orig, 1000);
     };
 
     renderQuestion();
