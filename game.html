@@ -575,20 +575,26 @@
     // ── Claude API ───────────────────────────────────────────
     async function callClaude(system, userMsg, history) {
       try {
-        const res = await fetch("https://dcg-proxy.blaine-anthony.workers.dev",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            model:"claude-sonnet-4-20250514",
-            max_tokens:1000,
-            system,
-            messages:[...history,{role:"user",content:userMsg}]
-          })
+        const payload = {
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1000,
+          system: system,
+          messages: [...history, {role:"user", content:userMsg}]
+        };
+        const bodyStr = JSON.stringify(payload);
+        console.log("Sending payload length:", bodyStr.length);
+        const res = await fetch("https://dcg-proxy.blaine-anthony.workers.dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: bodyStr
         });
-        const data=await res.json();
-        return data.content?.[0]?.text||"// DM signal lost. Try again.";
+        const text = await res.text();
+        console.log("Raw response:", text.substring(0, 200));
+        const data = JSON.parse(text);
+        if (data.error) { console.error("API error:", JSON.stringify(data.error)); return "// DM signal lost. Try again."; }
+        return data.content?.[0]?.text || "// DM signal lost. Try again.";
       } catch(e) {
-        console.error(e);
+        console.error("callClaude error:", e);
         return "// SYSTEM ERROR: DM transmission failed. Please retry.";
       }
     }
