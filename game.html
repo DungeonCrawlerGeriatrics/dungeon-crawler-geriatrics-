@@ -3,129 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dungeon Crawler Geriatrics — In Progress</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<title>Dungeon Crawler Geriatrics — Active Instance</title>
 <link rel="stylesheet" href="css/global.css">
 <link rel="stylesheet" href="css/game.css">
 </head>
 <body class="game-page">
 
+  <!-- HEADER -->
   <header class="game-header">
-    <div class="gh-left">
-      <span class="gh-logo">⚔️</span>
-      <span class="gh-campaign" id="gh-campaign">Loading...</span>
+    <div class="gh-brand">
+      <div class="gh-brand-title">DCG</div>
     </div>
-    <div class="gh-center">
-      <div class="gh-location">
-        <span class="gh-loc-icon">🗺️</span>
-        <span id="gh-location-name">The Gates of Shadow</span>
-        <span class="gh-depth" id="gh-depth">LEVEL 1</span>
-      </div>
+    <div class="gh-location">
+      <span class="gh-location-label">LOC:</span>
+      <span id="gh-location-text">Unknown — You Smell Mildew</span>
     </div>
     <div class="gh-right">
-      <span class="gh-code-label">ROOM</span>
-      <span class="gh-code" id="gh-room-code">????</span>
+      <div class="gh-room">ROOM <span id="gh-room-code">????</span></div>
       <div class="gh-pips" id="gh-pips"></div>
     </div>
   </header>
 
   <div class="game-layout">
 
-    <aside class="panel panel-left">
-      <div class="panel-hd">⚔ Your Party</div>
-      <div id="party-panel"></div>
-      <div class="panel-hd" style="margin-top:1rem;">🎒 Inventory</div>
-      <div class="inventory-list" id="inventory-list">
-        <div class="inv-item"><span>🧪</span> Healing Potion <em>×4</em></div>
-        <div class="inv-item"><span>🕯️</span> Torch <em>×6</em></div>
-        <div class="inv-item"><span>🗺️</span> Old Map Fragment</div>
-        <div class="inv-item"><span>🪙</span> Gold Coins <em>×20</em></div>
-      </div>
+    <!-- LEFT: Party -->
+    <aside class="panel panel-left" id="panel-left">
+      <div class="panel-hd">// PARTY STATUS</div>
+      <div id="party-list"></div>
     </aside>
 
+    <!-- CENTER: Group log + input -->
     <main class="panel panel-center">
-      <div class="dungeon-log" id="dungeon-log">
-        <div class="log-welcome">
-          <div class="log-welcome-icon">🏰</div>
-          <div class="log-welcome-text">Summoning the Dungeon Master...</div>
+
+      <div class="channel-tabs">
+        <button class="channel-tab active" id="tab-group" onclick="switchTab('group')">
+          📡 GROUP CHANNEL
+          <div class="unread-dot" id="dot-group"></div>
+        </button>
+      </div>
+
+      <div class="log-area" id="group-log">
+        <div class="log-empty">
+          <div class="log-empty-icon">📡</div>
+          <div class="log-empty-text">AWAITING SYSTEM INITIALIZATION...<span class="blink">_</span></div>
         </div>
       </div>
+
       <div class="dm-typing" id="dm-typing">
-        <span class="dm-typing-label">🎲 The Dungeon Master stirs...</span>
+        <span class="dm-typing-label">// DM PROCESSING</span>
         <div class="typing-dots"><span></span><span></span><span></span></div>
       </div>
+
       <div class="input-zone">
-        <div class="turn-bar">
-          <span class="turn-label">ACTING:</span>
-          <div class="turn-heroes" id="turn-heroes"></div>
+        <div class="turn-indicator">
+          <span class="turn-label">TURN:</span>
+          <div class="turn-chips" id="turn-chips"></div>
+          <span id="round-label" style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--sys-text-faint);margin-left:auto;">RND 1</span>
         </div>
-        <div class="my-turn-panel" id="my-turn-panel">
+
+        <!-- My turn -->
+        <div id="my-turn-zone">
           <div class="quick-actions">
-            <button class="qa-btn" onclick="quickAction('I search the area carefully for traps, secrets, or anything useful.')">🔍 Search</button>
-            <button class="qa-btn" onclick="quickAction('I use a healing potion to restore my wounds.')">🧪 Heal</button>
-            <button class="qa-btn" onclick="quickAction('I attempt to rest briefly and catch my breath. My knees are killing me.')">💤 Rest</button>
-            <button class="qa-btn" onclick="quickAction('I look around and describe what I observe to my party.')">👁️ Look</button>
-            <button class="qa-btn" onclick="quickAction('I complain loudly about being here and ask if we can go home yet.')">😤 Complain</button>
+            <button class="qa-btn" onclick="quickAction('I carefully examine my surroundings.')">👁 Look</button>
+            <button class="qa-btn" onclick="quickAction('I search the area for anything useful or hidden.')">🔍 Search</button>
+            <button class="qa-btn" onclick="quickAction('I try to catch my breath and rest for a moment.')">💤 Rest</button>
+            <button class="qa-btn" onclick="quickAction('I complain loudly about being here.')">😤 Complain</button>
+            <button class="qa-btn" onclick="quickAction('I attempt to communicate with or reason with whatever is nearby.')">💬 Talk</button>
           </div>
           <div class="input-row">
-            <textarea class="action-textarea" id="action-input" placeholder="What do you do? (Besides regret coming here)" onkeydown="handleKey(event)" rows="2"></textarea>
-            <button class="btn btn-ember btn-send" id="btn-send" onclick="sendAction()">⚡<br><span>Act</span></button>
+            <textarea class="action-textarea" id="action-input"
+              placeholder="What do you do? (The System is watching...)"
+              onkeydown="handleGroupKey(event)"
+              rows="2"></textarea>
+            <div class="send-btn-wrap">
+              <button class="btn-send public" id="btn-act" onclick="sendGroupAction()">⚡ ACT</button>
+            </div>
           </div>
         </div>
-        <div class="waiting-panel" id="waiting-panel" style="display:none;">
-          <div class="waiting-hero-icon" id="waiting-hero-icon">⚔️</div>
-          <div class="waiting-hero-text" id="waiting-hero-text">Waiting for another hero to act...</div>
+
+        <!-- Waiting for others -->
+        <div id="waiting-zone" style="display:none">
+          <div class="waiting-bar">
+            <div class="waiting-avatar" id="wait-avatar">⚔️</div>
+            <div class="waiting-text" id="wait-text">Waiting for another survivor to act...</div>
+          </div>
         </div>
       </div>
     </main>
 
+    <!-- RIGHT: Private DM channel -->
     <aside class="panel panel-right">
-      <div class="panel-hd">⚡ Dungeon Depth</div>
-      <div class="info-card">
-        <div class="depth-track" id="depth-track">
-          <div class="depth-pip active">1</div>
-          <div class="depth-pip">2</div>
-          <div class="depth-pip">3</div>
-          <div class="depth-pip">4</div>
-          <div class="depth-pip skull">💀</div>
+
+      <div class="private-header">
+        <div class="private-title">🔮 PRIVATE CHANNEL</div>
+        <div class="private-subtitle">Only you and the DM can see this</div>
+      </div>
+
+      <div class="private-log" id="private-log">
+        <div class="private-empty">
+          NO PRIVATE TRANSMISSIONS<br><br>
+          Whisper something to the DM.<br>
+          Your party won't hear a thing.<br><br>
+          <span style="color:var(--sys-text-faint);font-size:.55rem;">Secrets have consequences.</span>
         </div>
       </div>
-      <div class="panel-hd">📜 Turn Order</div>
-      <div class="turn-order" id="turn-order"></div>
-      <div class="panel-hd">⚙ Session</div>
-      <div class="session-info">
-        <div class="sess-row"><span>Room</span><strong id="sess-room">????</strong></div>
-        <div class="sess-row"><span>Turn</span><strong id="sess-turn">1</strong></div>
-        <div class="sess-row"><span>Round</span><strong id="sess-round">1</strong></div>
-      </div>
-      <button class="btn btn-danger btn-sm" style="margin-top:auto;" onclick="leaveGame()">🚪 I Want To Go Home</button>
-    </aside>
 
+      <div class="private-input-zone">
+        <div class="private-input-label">// WHISPER TO DM (PRIVATE)</div>
+        <textarea class="private-textarea" id="private-input"
+          placeholder="Psst... DM. Don't tell the others but..."
+          onkeydown="handlePrivateKey(event)"
+          rows="3"></textarea>
+        <button class="btn btn-block" style="border-color:var(--sys-purple);color:var(--sys-purple);font-size:.7rem;padding:.45rem;" onclick="sendPrivateAction()">
+          🔮 SEND PRIVATELY
+        </button>
+      </div>
+
+      <div class="depth-section">
+        <div class="panel-hd" style="margin-bottom:.4rem;">// DEPTH</div>
+        <div class="depth-track" id="depth-track">
+          <div class="depth-pip active" data-d="1">1</div>
+          <div class="depth-pip" data-d="2">2</div>
+          <div class="depth-pip" data-d="3">3</div>
+          <div class="depth-pip" data-d="4">4</div>
+          <div class="depth-pip boss" data-d="5">💀</div>
+        </div>
+      </div>
+
+      <!-- Session info -->
+      <div style="padding:.75rem;border-top:1px solid var(--sys-border);margin-top:auto;flex-shrink:0;">
+        <div class="panel-hd">// SESSION</div>
+        <div style="display:flex;flex-direction:column;gap:.3rem;">
+          <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--sys-text-dim);">
+            <span>TURN</span><span id="sess-turn" style="color:var(--sys-gold)">1</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--sys-text-dim);">
+            <span>ROUND</span><span id="sess-round" style="color:var(--sys-gold)">1</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--sys-text-dim);">
+            <span>PLAYERS</span><span id="sess-players" style="color:var(--sys-gold)">?</span>
+          </div>
+        </div>
+        <button class="btn btn-red btn-sm btn-block" style="margin-top:.75rem;" onclick="leaveGame()">
+          [ RAGEQUIT ]
+        </button>
+      </div>
+
+    </aside>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+    import { getDatabase, ref, set, get, onValue, update, push }
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey:            "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
-      authDomain:        "dungeon-crawler-geriatrics.firebaseapp.com",
-      databaseURL:       "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
-      projectId:         "dungeon-crawler-geriatrics",
-      storageBucket:     "dungeon-crawler-geriatrics.firebasestorage.app",
+    const FB = {
+      apiKey: "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
+      authDomain: "dungeon-crawler-geriatrics.firebaseapp.com",
+      databaseURL: "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
+      projectId: "dungeon-crawler-geriatrics",
+      storageBucket: "dungeon-crawler-geriatrics.firebasestorage.app",
       messagingSenderId: "967017118838",
-      appId:             "1:967017118838:web:fd4497925ca83bfb34b357"
+      appId: "1:967017118838:web:fd4497925ca83bfb34b357"
     };
+    const db = getDatabase(initializeApp(FB));
 
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
-
-    // ── Boot ────────────────────────────────────────────────
+    // ── State ───────────────────────────────────────────────
     const params   = new URLSearchParams(window.location.search);
     const roomCode = params.get("room");
-    const me       = JSON.parse(sessionStorage.getItem("dungeon_player") || "null");
-    if (!roomCode || !me) { window.location.href = "index.html"; }
+    const me       = JSON.parse(sessionStorage.getItem("dcg_player")||"null");
+    if (!roomCode||!me) { window.location.href="index.html"; }
 
     let roomData     = null;
     let players      = [];
@@ -134,19 +181,18 @@
     let turnCount    = 0;
     let roundCount   = 1;
     let depth        = 1;
-    let aiHistory    = [];
+    let aiHistory    = [];       // shared group AI history
     let isDMThinking = false;
-    let renderedKeys = new Set();
+    let renderedGroupKeys = new Set();
 
     document.getElementById("gh-room-code").textContent = roomCode;
-    document.getElementById("sess-room").textContent    = roomCode;
 
     // Mark online
-    update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true });
+    update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:true});
 
     // ── Firebase listener ───────────────────────────────────
-    onValue(ref(db, `rooms/${roomCode}`), snap => {
-      if (!snap.exists()) { window.location.href = "index.html"; return; }
+    onValue(ref(db,`rooms/${roomCode}`), snap => {
+      if(!snap.exists()){window.location.href="index.html";return;}
       roomData   = snap.val();
       players    = Object.values(roomData.players||{}).sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
       myPlayer   = players.find(p=>p.id===me.id);
@@ -155,91 +201,109 @@
       roundCount = roomData.roundCount || 1;
       depth      = roomData.depth      || 1;
 
-      document.getElementById("gh-campaign").textContent      = roomData.campaign || "Dungeon Crawler Geriatrics";
-      document.getElementById("gh-location-name").textContent = roomData.location || "The Gates of Shadow";
-      document.getElementById("gh-depth").textContent         = `LEVEL ${depth}`;
-      document.getElementById("sess-turn").textContent        = turnCount + 1;
-      document.getElementById("sess-round").textContent       = roundCount;
+      document.getElementById("gh-location-text").textContent = roomData.location || "Unknown";
+      document.getElementById("sess-turn").textContent   = turnCount+1;
+      document.getElementById("sess-round").textContent  = roundCount;
+      document.getElementById("sess-players").textContent = players.length+"/4";
+      document.getElementById("round-label").textContent = `RND ${roundCount}`;
 
       renderParty();
       renderTurnBar();
-      renderTurnOrder();
       renderDepth();
       renderPips();
-      syncLog(roomData.log || {});
+      syncGroupLog(roomData.log||{});
 
-      // Host triggers opening narration once
-      if (me.isHost && Object.keys(roomData.log||{}).length === 0 && !isDMThinking) {
-        runOpeningNarration();
+      // Load private history from my player data
+      syncPrivateLog(myPlayer?.privateLog||{});
+
+      // Host triggers opening narration
+      if (me.isHost && Object.keys(roomData.log||{}).length===0 && !isDMThinking) {
+        runOpening();
       }
     });
 
-    // ── Party Panel ─────────────────────────────────────────
+    // ── Party panel ─────────────────────────────────────────
     function renderParty() {
-      document.getElementById("party-panel").innerHTML = players.map((p,i) => {
-        const isActive = i === turnIndex;
-        const hpPct    = Math.max(0, Math.min(100, ((p.hp ?? p.maxHp) / (p.maxHp||100)) * 100));
-        const mpPct    = Math.max(0, Math.min(100, ((p.mp ?? p.maxMp) / (p.maxMp||100)) * 100));
-        const hpClass  = hpPct > 60 ? "hp-high" : hpPct > 30 ? "hp-mid" : "hp-low";
+      document.getElementById("party-list").innerHTML = players.map((p,i) => {
+        const isActive = i===turnIndex;
+        const isMe     = p.id===me.id;
+        const hpPct    = Math.max(0,Math.min(100,((p.hp??p.maxHp)/(p.maxHp||40))*100));
+        const mpPct    = Math.max(0,Math.min(100,((p.mp??p.maxMp)/(p.maxMp||10))*100));
+        const hpCls    = hpPct>60?"hp-high":hpPct>30?"hp-mid":"hp-low";
+        const cls      = p.heroClass||null;
+        const clsColor = cls ? `var(--${cls})` : "var(--sys-text-faint)";
+
+        const stats = p.stats || {STR:"?",DEX:"?",CON:"?",INT:"?",WIS:"?",CHA:"?"};
+        const statKeys = ["STR","DEX","CON","INT","WIS","CHA"];
+
         return `
-          <div class="hero-mini ${p.heroClass||"warrior"} ${isActive?"active-turn":""} ${(p.hp??1)<=0?"fallen":""} ${p.id===me.id?"my-hero":""}">
-            ${isActive?`<div class="active-turn-badge">⚔ Acting</div>`:""}
-            <div class="hero-mini-top">
-              <div class="hero-mini-avatar">${p.heroEmoji||"⚔️"}</div>
-              <div>
-                <div class="hero-mini-name">${p.name}${p.id===me.id?` <span style="color:var(--gold-dim);font-size:.55rem">(YOU)</span>`:""}</div>
-                <div class="hero-mini-class">${p.heroName||"Hero"}</div>
+        <div class="hero-card ${isActive?"active-turn":""} ${isMe?"my-card":""} ${(p.hp??1)<=0?"fallen":""}">
+          ${isActive?`<div class="acting-tag">◀ ACTING</div>`:""}
+          <div class="hero-card-top">
+            <div class="hero-avatar">${p.heroEmoji||"?"}</div>
+            <div class="hero-info">
+              <div class="hero-name">${p.name}${isMe?`<span class="you-tag">(you)</span>`:""}</div>
+              <div class="hero-class-badge ${cls?"revealed":""}">
+                ${cls ? `[${cls.toUpperCase()}]` : "[CLASS: ???]"}
               </div>
             </div>
-            <div class="hero-mini-bars">
-              <div class="bar-label-row"><span>HP</span><span>${p.hp??p.maxHp}/${p.maxHp}</span></div>
-              <div class="bar-track"><div class="bar-fill ${hpClass}" style="width:${hpPct}%"></div></div>
-              <div class="bar-label-row" style="margin-top:.3rem"><span>MP</span><span>${p.mp??p.maxMp}/${p.maxMp}</span></div>
-              <div class="bar-track"><div class="bar-fill mp" style="width:${mpPct}%"></div></div>
-            </div>
-            <div class="hero-mini-statuses">${(p.statuses||[]).map(s=>`<div class="status-badge status-${s}">${s}</div>`).join("")}${(p.hp??1)<=0?`<div class="status-badge status-dead">FALLEN</div>`:""}</div>
-          </div>`;
+          </div>
+          <div class="stat-row">
+            ${statKeys.map(k=>`
+              <div class="stat-box">
+                <div class="stat-label">${k}</div>
+                <div class="stat-val" style="${parseInt(stats[k])>=10?"color:var(--sys-gold)":""}">${stats[k]??'?'}</div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-row"><span>HP</span><span>${p.hp??p.maxHp}/${p.maxHp}</span></div>
+            <div class="bar-track"><div class="bar-fill ${hpCls}" style="width:${hpPct}%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label-row"><span>MP</span><span>${p.mp??p.maxMp}/${p.maxMp}</span></div>
+            <div class="bar-track"><div class="bar-fill mp" style="width:${mpPct}%"></div></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:.2rem;margin-top:.3rem;">
+            ${(p.statuses||[]).map(s=>`<span class="pill pill-${s}">${s}</span>`).join("")}
+            ${(p.hp??1)<=0?`<span class="pill" style="border-color:var(--sys-red);color:var(--sys-red)">FALLEN</span>`:""}
+          </div>
+        </div>`;
       }).join("");
     }
 
-    // ── Turn Bar ────────────────────────────────────────────
+    // ── Turn bar ────────────────────────────────────────────
     function renderTurnBar() {
       const actor    = players[turnIndex];
-      const isMyTurn = actor?.id === me.id;
+      const isMyTurn = actor?.id===me.id;
 
-      document.getElementById("turn-heroes").innerHTML = players.map((p,i) => `
-        <div class="turn-chip ${p.heroClass||"warrior"} ${i===turnIndex?"active":""}">
-          ${p.heroEmoji||"⚔️"} ${p.name.split(" ")[0]}
+      document.getElementById("turn-chips").innerHTML = players.map((p,i)=>`
+        <div class="turn-chip ${i===turnIndex?"active":""}">
+          ${p.heroEmoji||"?"} ${p.name.split(" ")[0]}
         </div>`).join("");
 
-      const myEl   = document.getElementById("my-turn-panel");
-      const waitEl = document.getElementById("waiting-panel");
+      const myZone   = document.getElementById("my-turn-zone");
+      const waitZone = document.getElementById("waiting-zone");
+
       if (isMyTurn && !isDMThinking) {
-        myEl.style.display   = "block";
-        waitEl.style.display = "none";
-        document.getElementById("action-input").placeholder = `What does ${myPlayer?.name||"your hero"} do? (Besides regret coming here)`;
+        myZone.style.display   = "block";
+        waitZone.style.display = "none";
+        document.getElementById("action-input").placeholder = `What does ${myPlayer?.name||"you"} do? (The System watches everything)`;
       } else {
-        myEl.style.display   = "none";
-        waitEl.style.display = "flex";
-        document.getElementById("waiting-hero-icon").textContent = actor?.heroEmoji || "⚔️";
-        document.getElementById("waiting-hero-text").textContent = isDMThinking
-          ? "The Dungeon Master is weaving your inevitable doom..."
-          : `Waiting for ${actor?.name||"another hero"} to act...`;
+        myZone.style.display   = "none";
+        waitZone.style.display = "block";
+        document.getElementById("wait-avatar").textContent = actor?.heroEmoji||"?";
+        document.getElementById("wait-text").textContent = isDMThinking
+          ? "// DM IS PROCESSING YOUR COLLECTIVE POOR DECISIONS..."
+          : `Waiting for ${actor?.name||"someone"} to act...`;
       }
     }
 
-    function renderTurnOrder() {
-      document.getElementById("turn-order").innerHTML = players.map((p,i)=>`
-        <div class="to-item ${i===turnIndex?"current":""}">
-          <span class="to-num">${i+1}</span>
-          <span>${p.heroEmoji||"⚔️"}</span>
-          <span>${p.name}</span>
-          ${i===turnIndex?`<span style="margin-left:auto;font-size:.6rem;color:var(--gold)">◀ NOW</span>`:""}
-        </div>`).join("");
-    }
-
     function renderDepth() {
-      document.querySelectorAll(".depth-pip").forEach((pip,i) => pip.classList.toggle("active", i+1===depth||(i===4&&depth>=5)));
+      document.querySelectorAll(".depth-pip").forEach(pip => {
+        const d = parseInt(pip.dataset.d);
+        pip.classList.toggle("active", d===depth||(d===5&&depth>=5));
+      });
     }
 
     function renderPips() {
@@ -249,158 +313,354 @@
       }).join("");
     }
 
-    // ── Log ─────────────────────────────────────────────────
-    function syncLog(logObj) {
-      Object.entries(logObj).sort(([,a],[,b])=>(a.ts||0)-(b.ts||0)).forEach(([key,entry]) => {
-        if (renderedKeys.has(key)) return;
-        renderedKeys.add(key);
-        document.querySelector(".log-welcome")?.remove();
-        appendLogEntry(entry);
+    // ── Group log ────────────────────────────────────────────
+    function syncGroupLog(logObj) {
+      Object.entries(logObj).sort(([,a],[,b])=>(a.ts||0)-(b.ts||0)).forEach(([key,entry])=>{
+        if(renderedGroupKeys.has(key)) return;
+        renderedGroupKeys.add(key);
+        document.querySelector(".log-empty")?.remove();
+        appendGroupEntry(entry);
       });
     }
 
-    function appendLogEntry(entry) {
-      const log = document.getElementById("dungeon-log");
+    function appendGroupEntry(entry) {
+      const log = document.getElementById("group-log");
       const div = document.createElement("div");
-      if (entry.type === "dm") {
+
+      if (entry.type==="dm") {
         div.className = "log-entry log-dm";
-        div.innerHTML = `<div class="log-speaker">🎲 DUNGEON MASTER 🎲</div><div class="log-body">${entry.text.replace(/\[([^\]]+)\]/g,'<span class="mechanic">[$1]</span>').replace(/\n/g,"<br>")}</div>`;
-      } else if (entry.type === "player") {
-        const p = players.find(p=>p.id===entry.playerId);
-        div.className = `log-entry log-player ${p?.heroClass||"warrior"}`;
-        div.innerHTML = `<div class="log-speaker">${entry.emoji||"⚔️"} ${(entry.playerName||"HERO").toUpperCase()}</div><div class="log-body">"${entry.text}"</div>`;
+        div.innerHTML = `
+          <div class="log-who">🎲 DUNGEON MASTER</div>
+          <div class="log-body">${formatDM(entry.text)}</div>`;
+      } else if (entry.type==="player") {
+        const p = players.find(p=>p.id===entry.pid);
+        const cls = p?.heroClass||"unknown";
+        div.className = `log-entry log-player`;
+        div.innerHTML = `
+          <div class="log-who" style="color:var(--${cls})">${entry.emoji||"?"} ${(entry.pname||"SURVIVOR").toUpperCase()}</div>
+          <div class="log-body">"${entry.text}"</div>`;
+      } else if (entry.type==="sys") {
+        div.className = "log-entry log-sys";
+        const sClass = entry.sclass||"";
+        div.innerHTML = `<div class="sys-notify ${sClass}">${entry.text}</div>`;
       } else {
-        div.className = "log-entry log-system";
+        div.className = "log-entry log-round";
         div.innerHTML = `<div class="log-body">— ${entry.text} —</div>`;
       }
+
       log.appendChild(div);
       log.scrollTop = log.scrollHeight;
     }
 
-    async function writeLog(entry) {
-      const key = `${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-      await set(ref(db, `rooms/${roomCode}/log/${key}`), {...entry, ts: Date.now()});
+    function formatDM(text) {
+      return text
+        .replace(/\[SYSTEM:[^\]]+\]/g, m => `<span class="mech">${m}</span>`)
+        .replace(/\[([^\]]+)\]/g, m => `<span class="mech">${m}</span>`)
+        .replace(/\{LOOT:[^}]+\}/g, m => `<span class="loot">${m.replace(/\{LOOT:/,"").replace(/\}/,"")}</span>`)
+        .replace(/\n/g,"<br>");
     }
 
-    // ── Turn advance ────────────────────────────────────────
+    async function writeGroupLog(entry) {
+      const key = `${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+      await set(ref(db,`rooms/${roomCode}/log/${key}`),{...entry,ts:Date.now()});
+    }
+
+    // ── Private log ──────────────────────────────────────────
+    let renderedPrivateKeys = new Set();
+
+    function syncPrivateLog(logObj) {
+      const log = document.getElementById("private-log");
+      const entries = Object.entries(logObj||{}).sort(([,a],[,b])=>(a.ts||0)-(b.ts||0));
+      if (entries.length===0) return;
+      document.querySelector(".private-empty")?.remove();
+
+      entries.forEach(([key,entry])=>{
+        if(renderedPrivateKeys.has(key)) return;
+        renderedPrivateKeys.add(key);
+        const div = document.createElement("div");
+        div.className = `private-entry ${entry.from==="dm"?"from-dm":"from-me"}`;
+        div.innerHTML = `
+          <div class="pe-who">${entry.from==="dm"?"🔮 DM (PRIVATE)":"🔒 YOU (PRIVATE)"}</div>
+          <div class="pe-body">${entry.from==="dm"?formatDM(entry.text):entry.text}</div>`;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      });
+    }
+
+    async function writePrivateLog(entry) {
+      const key = `${Date.now()}_${Math.random().toString(36).slice(2,5)}`;
+      await set(ref(db,`rooms/${roomCode}/players/${me.id}/privateLog/${key}`),{...entry,ts:Date.now()});
+    }
+
+    // ── Advance turn ────────────────────────────────────────
     async function advanceTurn() {
-      let next = (turnIndex + 1) % players.length;
-      for (let i=0; i<players.length; i++) { if ((players[next]?.hp??1)>0) break; next=(next+1)%players.length; }
-      const newTurn  = turnCount + 1;
-      const newRound = Math.floor(newTurn / players.length) + 1;
-      await update(ref(db, `rooms/${roomCode}`), { turnIndex: next, turnCount: newTurn, roundCount: newRound });
-      if (newTurn % players.length === 0) await writeLog({ type:"system", text:`Round ${newRound} begins` });
+      let next = (turnIndex+1)%players.length;
+      for(let i=0;i<players.length;i++){if((players[next]?.hp??1)>0)break;next=(next+1)%players.length;}
+      const newTurn  = turnCount+1;
+      const newRound = Math.floor(newTurn/players.length)+1;
+      await update(ref(db,`rooms/${roomCode}`),{turnIndex:next,turnCount:newTurn,roundCount:newRound});
+      if(newTurn%players.length===0) await writeGroupLog({type:"round",text:`Round ${newRound}`});
     }
 
-    // ── Opening narration ───────────────────────────────────
-    async function runOpeningNarration() {
-      isDMThinking = true;
-      setTyping(true); renderTurnBar();
+    // ── Opening narration ────────────────────────────────────
+    async function runOpening() {
+      isDMThinking=true; setTyping(true); renderTurnBar();
 
-      const partyList = players.map(p=>`- ${p.name} the ${p.heroName} (HP:${p.maxHp}, MP:${p.maxMp})`).join("\n");
-      const opening = `Four middle-aged adventurers stand at the entrance of the Dungeon of Eternal Shadows. They did not plan to be here. Several of them have work tomorrow.\n\nThe party:\n${partyList}\n\nSet the scene dramatically! Describe the dungeon entrance with dark atmosphere and dread, but don't forget — these are regular people in their 40s who have somehow ended up on a dungeon adventure. Channel Dungeon Crawler Carl energy: gritty, funny, dangerous. End with their first challenge or choice.`;
+      const party = players.map(p=>`- ${p.name} (${statLine(p)})`).join("\n");
+      const openMsg = `DUNGEON INSTANCE INITIALIZED.\n\nThe friends:\n${party}\n\nThey were just hanging out — maybe a game night, watching something, having drinks. Then the System activated without warning. Their living room is now the entry chamber of a dungeon. Some of their stuff came with them.\n\nBegin. Describe the sudden transition — the terror and confusion of the System activation. Introduce the in-world System UI notification floating in their vision. Make it funny AND genuinely alarming. End with their immediate situation and first choice.`;
 
-      const dmText = await callClaude(buildSystem(), opening);
-      aiHistory = [{role:"user",content:opening},{role:"assistant",content:dmText}];
-      await update(ref(db,`rooms/${roomCode}`), { aiHistory: JSON.stringify(aiHistory) });
-      await writeLog({ type:"dm", text:dmText });
+      const dmText = await callClaude(buildSysPrompt(), openMsg, []);
+      aiHistory = [{role:"user",content:openMsg},{role:"assistant",content:dmText}];
+      await update(ref(db,`rooms/${roomCode}`),{aiHistory:JSON.stringify(aiHistory)});
 
-      isDMThinking = false; setTyping(false);
+      // Post any [SYSTEM:] notifications as separate entries first
+      await postSystemNotifs(dmText);
+      await writeGroupLog({type:"dm",text:dmText});
+
+      isDMThinking=false; setTyping(false);
     }
 
-    // ── Send action ─────────────────────────────────────────
-    window.sendAction = async function () {
+    // ── Group action ─────────────────────────────────────────
+    window.sendGroupAction = async function() {
       const input = document.getElementById("action-input");
       const text  = input.value.trim();
-      if (!text || isDMThinking) return;
-      if (players[turnIndex]?.id !== me.id) { showToast("It's not your turn!", true); return; }
+      if(!text||isDMThinking) return;
+      if(players[turnIndex]?.id!==me.id){showToast("NOT YOUR TURN",true);return;}
 
-      input.value = "";
-      isDMThinking = true; setTyping(true); renderTurnBar();
+      input.value="";
+      isDMThinking=true; setTyping(true); renderTurnBar();
 
-      await writeLog({ type:"player", playerId:me.id, playerName:myPlayer?.name||me.name, emoji:myPlayer?.heroEmoji||"⚔️", text });
+      // Log player action publicly
+      await writeGroupLog({type:"player",pid:me.id,pname:myPlayer?.name||me.name,emoji:myPlayer?.heroEmoji||"?",text});
 
-      const snap = await get(ref(db, `rooms/${roomCode}/aiHistory`));
-      if (snap.exists()) { try { aiHistory = JSON.parse(snap.val()); } catch(e){} }
+      // Load latest AI history
+      const snap = await get(ref(db,`rooms/${roomCode}/aiHistory`));
+      if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
 
       const actor  = players[turnIndex];
-      const status = players.map(p=>`${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""}`).join(", ");
-      const msg    = `[Turn ${turnCount+1} | Round ${roundCount} | Depth ${depth}]\n${actor?.name} (${actor?.heroName}) acts: "${text}"\nParty: ${status}\n\nNarrate the result! Use [brackets] for all mechanics.`;
+      const pStatus = players.map(p=>`${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""} Class:${p.heroClass||"???"}`).join(" | ");
+      const msg = `[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]\n${actor?.name} acts: "${text}"\nParty: ${pStatus}\n\nNarrate result. Use [SYSTEM: text] for system notifications, {LOOT: item description} for items found. Track class-revealing behavior — if this action strongly suggests a class archetype, NOW is when you might dramatically reveal it with [SYSTEM: CLASS ASSIGNMENT — name is now a ClassName!]. Use [brackets] for all mechanics.`;
 
-      const dmText = await callClaude(buildSystem(), msg);
+      const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
-      await update(ref(db,`rooms/${roomCode}`), { aiHistory: JSON.stringify(aiHistory) });
+      await update(ref(db,`rooms/${roomCode}`),{aiHistory:JSON.stringify(aiHistory)});
 
-      // Parse HP changes
-      const updates = {};
-      const dmgRe = /\[(\w[\w\s]*?) takes (\d+) damage/gi; let m;
-      while((m=dmgRe.exec(dmText))!==null){const p=players.find(p=>p.name.toLowerCase().includes(m[1].toLowerCase())||m[1].toLowerCase().includes(p.name.toLowerCase().split(" ")[0]));if(p){updates[`players/${p.id}/hp`]=Math.max(0,(p.hp??p.maxHp)-parseInt(m[2]));}}
-      const healRe = /\[(\w[\w\s]*?) (?:heals?|recovers?) (\d+)/gi;
-      while((m=healRe.exec(dmText))!==null){const p=players.find(p=>p.name.toLowerCase().includes(m[1].toLowerCase())||m[1].toLowerCase().includes(p.name.toLowerCase().split(" ")[0]));if(p){updates[`players/${p.id}/hp`]=Math.min(p.maxHp,(p.hp??p.maxHp)+parseInt(m[2]));}}
-      if(Object.keys(updates).length) await update(ref(db,`rooms/${roomCode}`),updates);
-
-      await writeLog({ type:"dm", text:dmText });
+      // Parse mechanics
+      await parseMechanics(dmText);
+      await postSystemNotifs(dmText);
+      await writeGroupLog({type:"dm",text:dmText});
       await advanceTurn();
 
-      isDMThinking = false; setTyping(false);
+      isDMThinking=false; setTyping(false);
     };
 
-    window.quickAction = t => { document.getElementById("action-input").value = t; window.sendAction(); };
-    window.handleKey   = e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();window.sendAction();} };
+    // ── Private action ───────────────────────────────────────
+    window.sendPrivateAction = async function() {
+      const input = document.getElementById("private-input");
+      const text  = input.value.trim();
+      if(!text||isDMThinking) return;
 
-    // ── System prompt ───────────────────────────────────────
-    function buildSystem() {
-      return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a dark fantasy dungeon crawler where four people in their 40s have been dragged into a dungeon against their better judgment. Think Dungeon Crawler Carl vibes: gritty, dangerous, genuinely threatening monsters AND darkly funny moments. These aren't young heroes — they have back problems, read glasses, and keep wondering if they can reschedule this.
+      input.value="";
 
-PARTY:
-${players.map(p=>`- ${p.name} (${p.heroName}, HP:${p.hp??p.maxHp}/${p.maxHp}, MP:${p.mp??p.maxMp}/${p.maxMp})`).join("\n")}
+      // Log to private log
+      await writePrivateLog({from:"me",text});
 
-Current location: ${roomData?.location||"The Gates of Shadow"} (Depth Level ${depth})
+      // Get my private history
+      const pSnap = await get(ref(db,`rooms/${roomCode}/players/${me.id}/privateHistory`));
+      let privateHistory = [];
+      if(pSnap.exists()){try{privateHistory=JSON.parse(pSnap.val());}catch(e){}}
 
-RULES:
-- Narrate vividly. Rich dark fantasy mixed with middle-aged exhaustion.
-- React to player actions with real consequences.
-- Use [brackets] for ALL mechanics: [Dave takes 15 damage! HP: 105/120]
-- Keep responses 150-300 words. End with a clear choice or challenge.
-- The dungeon has 5 levels. Final boss: The Shadow Lich (who also has back problems).
-- Be fair but dangerous. Death is possible. Embarrassment is certain.`;
+      // Show typing in private panel
+      const privateLog = document.getElementById("private-log");
+      document.querySelector(".private-empty")?.remove();
+
+      const typingEl = document.createElement("div");
+      typingEl.className="private-entry from-dm";
+      typingEl.innerHTML=`<div class="pe-who">🔮 DM (PRIVATE)</div><div class="pe-body"><span style="color:var(--sys-text-faint)">processing...</span></div>`;
+      privateLog.appendChild(typingEl);
+      privateLog.scrollTop=privateLog.scrollHeight;
+
+      const party = players.map(p=>`${p.name}:HP${p.hp??p.maxHp}/${p.maxHp} Class:${p.heroClass||"???"}`).join(", ");
+      const pmMsg = `[PRIVATE MESSAGE from ${myPlayer?.name||me.name}]\n"${text}"\n\nParty state: ${party}\nCurrent location: ${roomData?.location||"Unknown"}, Depth ${depth}\n\nRespond privately. Only this player can see your response. You can reveal secrets, private info, items, or special opportunities. Use your DM discretion about what bleeds into the public channel. Keep it under 150 words.`;
+
+      const dmText = await callClaude(buildPrivateSysPrompt(), pmMsg, privateHistory);
+      privateHistory.push({role:"user",content:pmMsg},{role:"assistant",content:dmText});
+      await update(ref(db,`rooms/${roomCode}/players/${me.id}`),{privateHistory:JSON.stringify(privateHistory)});
+
+      typingEl.remove();
+      await writePrivateLog({from:"dm",text:dmText});
+
+      // DM decides if anything bleeds to group (vague hint only, based on DM text)
+      if(dmText.toLowerCase().includes("[public:")) {
+        const pubMatch = dmText.match(/\[public:\s*([^\]]+)\]/i);
+        if(pubMatch) await writeGroupLog({type:"sys",sclass:"",text:`SYSTEM: Something shifts in the air near ${myPlayer?.name||me.name}...`});
+      }
+    };
+
+    window.quickAction = t => { document.getElementById("action-input").value=t; };
+    window.handleGroupKey = e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();window.sendGroupAction();} };
+    window.handlePrivateKey = e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();window.sendPrivateAction();} };
+
+    // ── Parse mechanics from DM text ─────────────────────────
+    async function parseMechanics(text) {
+      const updates={};
+
+      // Damage
+      const dmgRe=/\[([A-Za-z][\w\s]+?) takes (\d+) damage/gi; let m;
+      while((m=dmgRe.exec(text))!==null){
+        const p=findPlayer(m[1]);
+        if(p){const hp=Math.max(0,(p.hp??p.maxHp)-parseInt(m[2]));updates[`players/${p.id}/hp`]=hp;}
+      }
+      // Healing
+      const healRe=/\[([A-Za-z][\w\s]+?) (?:heals?|recovers?) (\d+)/gi;
+      while((m=healRe.exec(text))!==null){
+        const p=findPlayer(m[1]);
+        if(p){const hp=Math.min(p.maxHp,(p.hp??p.maxHp)+parseInt(m[2]));updates[`players/${p.id}/hp`]=hp;}
+      }
+      // Class assignment
+      const classRe=/CLASS ASSIGNMENT[^!]*?(\w+) is now (?:a |an )?(\w+)/i;
+      const classMatch=text.match(classRe);
+      if(classMatch){
+        const playerName=classMatch[1]; const className=classMatch[2].toLowerCase();
+        const validClasses=["warrior","rogue","mage","paladin","bard","ranger","summoner","berserker"];
+        const matchedClass=validClasses.find(c=>className.includes(c));
+        if(matchedClass){
+          const p=findPlayer(playerName);
+          if(p){
+            updates[`players/${p.id}/heroClass`]=matchedClass;
+            updates[`players/${p.id}/heroEmoji`]=classEmoji(matchedClass);
+            // Post dramatic class reveal to group log
+            setTimeout(async()=>{
+              await writeGroupLog({type:"sys",sclass:"class-reveal",text:`⚡ SYSTEM: CLASS ASSIGNMENT — ${p.name} has been designated: ${matchedClass.toUpperCase()} ⚡`});
+            },500);
+          }
+        }
+      }
+      // Depth
+      const depthM=text.match(/(?:descend|reach|enter).{0,30}level\s*(\d)/i);
+      if(depthM){const d=Math.min(5,parseInt(depthM[1]));if(d>depth)updates["depth"]=d;}
+      // Location
+      const locM=text.match(/(?:you are now in|entering|arrived at|welcome to)\s+([^.\n,!]+)/i);
+      if(locM){const loc=locM[1].trim().replace(/^the /i,"");if(loc.length>3&&loc.length<60)updates["location"]=loc;}
+
+      if(Object.keys(updates).length) await update(ref(db,`rooms/${roomCode}`),updates);
     }
 
-    // ── Claude API ──────────────────────────────────────────
-    async function callClaude(system, userMsg) {
-      try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 1000,
-            system,
-            messages: [...aiHistory, {role:"user",content:userMsg}]
-          })
-        });
-        const data = await res.json();
-        return data.content?.[0]?.text || "The dungeon master has momentarily misplaced their reading glasses...";
-      } catch(err) {
-        console.error(err);
-        return "⚠ The crystal ball flickered. Try again.";
+    // Extract and post [SYSTEM:] messages as separate UI notifications
+    async function postSystemNotifs(text) {
+      const re=/\[SYSTEM:\s*([^\]]+)\]/gi; let m;
+      while((m=re.exec(text))!==null){
+        const msg=m[1].trim();
+        const sclass=msg.toLowerCase().includes("class")||msg.toLowerCase().includes("assign")?"class-reveal":
+                     msg.toLowerCase().includes("warning")||msg.toLowerCase().includes("danger")?"error":
+                     msg.toLowerCase().includes("acquired")||msg.toLowerCase().includes("level")?"green":"";
+        await writeGroupLog({type:"sys",sclass,text:`SYSTEM: ${msg}`});
       }
     }
 
-    function setTyping(on) { document.getElementById("dm-typing").classList.toggle("visible", on); }
+    function findPlayer(nameFragment) {
+      const f=nameFragment.toLowerCase().trim();
+      return players.find(p=>p.name.toLowerCase().includes(f)||f.includes(p.name.toLowerCase().split(" ")[0]));
+    }
 
-    window.leaveGame = function() {
-      if(confirm("Abandon your quest and go home?")) {
+    function classEmoji(cls) {
+      return {warrior:"⚔️",rogue:"🗡️",mage:"🔮",paladin:"🛡️",bard:"🎸",ranger:"🏹",summoner:"✨",berserker:"💢"}[cls]||"?";
+    }
+
+    function statLine(p) {
+      const s=p.stats||{};
+      return Object.entries(s).map(([k,v])=>`${k}:${v}`).join(" ");
+    }
+
+    // ── Claude API ───────────────────────────────────────────
+    async function callClaude(system, userMsg, history) {
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"claude-sonnet-4-20250514",
+            max_tokens:1000,
+            system,
+            messages:[...history,{role:"user",content:userMsg}]
+          })
+        });
+        const data=await res.json();
+        return data.content?.[0]?.text||"// DM signal lost. Try again.";
+      } catch(e) {
+        console.error(e);
+        return "// SYSTEM ERROR: DM transmission failed. Please retry.";
+      }
+    }
+
+    // ── System prompts ───────────────────────────────────────
+    function buildSysPrompt() {
+      const partyDesc = players.map(p=>`- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)}`).join("\n");
+      return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
+
+LORE: A mysterious System activated mid-evening without warning, pulling a group of friends from their living room into a dungeon. Nobody consented. The System is watching everything and assigns classes based on behavior — players don't choose their class, they EARN it through actions.
+
+THE PARTY (${players.length} survivors):
+${partyDesc}
+Location: ${roomData?.location||"Unknown"} | Depth: ${depth}
+
+TONE & STYLE:
+- Dark fantasy mixed with middle-aged mundane humor (Dungeon Crawler Carl vibes)
+- The System communicates via floating notifications: use [SYSTEM: message] for these
+- Loot has absurd flavor text: use {LOOT: item name — ridiculous description}
+- NPCs are aware they're in a "dungeon instance" — some treat it like a TV show
+- Stats are genuinely bad because these are regular people
+- Class reveals are DRAMATIC: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
+
+CLASS TRACKING (secret — don't tell players):
+Watch behavior patterns. After 4-6 actions showing clear tendency, assign a class dramatically.
+Available classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker
+Wildcard classes possible for unusual behavior.
+
+MECHANICS:
+- [Name takes X damage! HP: XX/XX]
+- [Name heals X HP! HP: XX/XX]  
+- [SYSTEM: New skill acquired — Skill Name]
+- [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
+- Keep responses 150-250 words. End with a clear situation/choice.
+- Pets CAN be found and adopted — make this special.
+- The dungeon has 5 levels. Final boss has back problems too.`;
+    }
+
+    function buildPrivateSysPrompt() {
+      const partyDesc = players.map(p=>`- ${p.name}: Class ${p.heroClass||"???"}, HP ${p.hp??p.maxHp}/${p.maxHp}`).join("\n");
+      return `You are the DM for Dungeon Crawler Geriatrics. A player is whispering to you PRIVATELY.
+
+PARTY: ${partyDesc}
+Location: ${roomData?.location||"Unknown"} | Depth: ${depth}
+
+This is a PRIVATE channel. Only this player sees your response. You can:
+- Reveal secrets the party doesn't know
+- Give them a private quest or opportunity  
+- Let them make a deal (maybe shady)
+- Tell them something about another player's behavior you've noticed
+- Give them a private item or skill
+- Let them find something they might not share
+
+If your response causes something visible to the group, include [public: vague description] and the group will see only a vague hint.
+
+Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have consequences.`;
+    }
+
+    function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
+
+    window.leaveGame = function(){
+      if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
         update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
-        sessionStorage.removeItem("dungeon_player");
+        sessionStorage.removeItem("dcg_player");
         window.location.href="index.html";
       }
     };
 
-    function showToast(msg, isError) {
-      let t = document.getElementById("__toast");
+    function showToast(msg,isError){
+      let t=document.getElementById("__toast");
       if(!t){t=document.createElement("div");t.id="__toast";t.className="toast";document.body.appendChild(t);}
-      t.textContent=msg; t.className="toast"+(isError?" error":"");
+      t.textContent=msg;t.className="toast"+(isError?" error":" success");
       requestAnimationFrame(()=>t.classList.add("show"));
       setTimeout(()=>t.classList.remove("show"),2500);
     }
