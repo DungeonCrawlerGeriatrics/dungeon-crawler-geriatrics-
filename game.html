@@ -1088,7 +1088,7 @@ Transition type: ${entry}
 OPENING SCENE RULES:
 - Reference at least ONE specific detail from a player's BS: (backstory) field — make them feel seen and roasted
 - Physical transition must match the type described above — no generic fog or mildew
-- Give each person ONE absurd mundane object that came with them (tag it: {LOOT: item — desc})
+- Give each person ONE absurd mundane object that came with them — tag with their name: {LOOT: PlayerName: item name — desc}. Use the exact player name from the #STATE block.
 - [SYSTEM: WELCOME] notification should be snarky and specific to this group
 - Do NOT describe emotional states — just the world going wrong
 - End mid-moment before anyone has processed what happened
@@ -1606,7 +1606,7 @@ RULES:
 - NEVER write player dialogue, thoughts, or actions. Players speak for themselves.
 - INVENTORY IS AUTHORITATIVE: only items in INV: lists exist. Never invent items.
 - NT: notes are DM-only — never reference them publicly or tell other players.
-- To give items: {LOOT: name — desc}. To move items: {TRANSFER: name — from:X to:Y}
+- To give items: {LOOT: name — desc} gives to acting player. {LOOT: PlayerName: name — desc} gives to a specific player.
 - CLASS assignment ONLY via: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
   Never mention a class in narration without firing this tag. Classes: Warrior, Rogue, Mage, Paladin, Bard, Ranger, Summoner, Berserker + wildcards.
 - Assign class after 4-6 actions showing clear tendency.
@@ -1979,20 +1979,42 @@ Keep response under 80 words. Short. Conspiratorial.`;
 
     // Auto-add loot from DM {LOOT: name — desc} tags
     function parseLootFromDM(text) {
+      // Supports two formats:
+      // {LOOT: item name — desc}          → goes to current actor (me)
+      // {LOOT: PlayerName: item name — desc} → goes to named player (host writes to their inventory)
       const regex = /\{LOOT:\s*([^—–}-]+)[—–-]?([^}]*)\}/g;
       let match;
-      // Dedupe: collect existing item names to avoid re-adding
-      const existingNames = new Set(
-        Object.values(myPlayer?.inventory||{}).map(i => i.name?.toLowerCase().trim())
-      );
+
       while ((match = regex.exec(text)) !== null) {
-        const name = match[1].trim();
-        const desc = match[2].trim();
-        if (existingNames.has(name.toLowerCase())) continue; // skip duplicate
-        existingNames.add(name.toLowerCase());
+        let rawName = match[1].trim();
+        let desc    = match[2].trim();
+        let targetId = me.id;
+
+        // Check if format is "PlayerName: item name"
+        const colonIdx = rawName.indexOf(':');
+        if (colonIdx > 0) {
+          const possiblePlayer = rawName.slice(0, colonIdx).trim();
+          const p = players.find(p => p.name.toLowerCase().startsWith(possiblePlayer.toLowerCase()));
+          if (p) {
+            targetId = p.id;
+            rawName  = rawName.slice(colonIdx + 1).trim();
+          }
+        }
+
+        // Only the host writes items for other players to avoid every client duplicating
+        // Each player writes their own items; host writes for everyone
+        const targetPlayer = players.find(p => p.id === targetId);
+        const existingNames = new Set(
+          Object.values(targetPlayer?.inventory||{}).map(i => i.name?.toLowerCase().trim())
+        );
+        if (existingNames.has(rawName.toLowerCase())) continue;
+
+        // Only write if: it's my own item, OR I am host (prevents multi-client duplication)
+        if (targetId !== me.id && !me.isHost) continue;
+
         const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`;
-        set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), {
-          name, desc, icon: "✦", ts: Date.now(), fromDM: true
+        set(ref(db, `rooms/${roomCode}/players/${targetId}/inventory/${key}`), {
+          name: rawName, desc, icon: "✦", ts: Date.now(), fromDM: true
         });
       }
     }
