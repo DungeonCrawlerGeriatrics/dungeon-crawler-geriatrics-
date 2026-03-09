@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staging Area — Dungeon Crawler Geriatrics</title>
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/waiting.css">
+</head>
+<body class="waiting-page">
+
+  <main class="waiting-wrap">
+
+    <!-- Header -->
+    <div class="wr-header">
+      <div class="wr-instance-label">[ DUNGEON INSTANCE — STAGING AREA ]</div>
+      <div class="wr-campaign" id="wr-campaign">Loading...</div>
+      <div class="wr-room-code" id="wr-room-code" onclick="copyCode()" title="Click to copy">????</div>
+      <div class="wr-copy-hint">CLICK CODE TO COPY · SHARE WITH FRIENDS</div>
+    </div>
+
+    <!-- Boot log -->
+    <div class="wr-bootlog">
+      <div class="boot-line"><span class="hi">SYSTEM:</span> Instance allocated. Dimensional anchor: stable.</div>
+      <div class="boot-line"><span class="hi">SYSTEM:</span> Scanning participants... <span class="warn">competencies: negligible</span></div>
+      <div class="boot-line"><span class="hi">SYSTEM:</span> Behavior classification: <span class="warn">PENDING</span> — observation mode active.</div>
+      <div class="boot-line"><span class="hi">SYSTEM:</span> Class assignment engine: <span class="ok">READY</span></div>
+      <div class="boot-line"><span class="warn">WARNING:</span> Consent forms waived. Escape probability: <span class="err">calculating...<span class="blink">_</span></span></div>
+    </div>
+
+    <!-- Player slots -->
+    <div class="wr-slots-header">
+      <span>// INSTANCE PARTICIPANTS</span>
+      <span id="slot-count">0 / 4 JOINED</span>
+    </div>
+    <div class="wr-slots" id="player-slots"></div>
+
+    <!-- Status -->
+    <div class="wr-status">
+      <div class="wr-status-text" id="status-text">
+        <span class="hi">SYSTEM:</span> Awaiting participants...
+      </div>
+      <div class="wr-player-count" id="player-count-display">0/4</div>
+    </div>
+
+    <!-- Begin / waiting -->
+    <div class="wr-begin-zone" id="begin-zone">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="wr-footer">
+      SYSTEM BUILD 0.0.1 · UNAUTHORIZED · YOUR EVENING IS FORFEIT
+    </div>
+
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+    const FB = {
+      apiKey: "AIzaSyCO0663W0Yrtl3R9HlE909tSx3m547c-zs",
+      authDomain: "dungeon-crawler-geriatrics.firebaseapp.com",
+      databaseURL: "https://dungeon-crawler-geriatrics-default-rtdb.firebaseio.com",
+      projectId: "dungeon-crawler-geriatrics",
+      storageBucket: "dungeon-crawler-geriatrics.firebasestorage.app",
+      messagingSenderId: "967017118838",
+      appId: "1:967017118838:web:fd4497925ca83bfb34b357"
+    };
+    const db = getDatabase(initializeApp(FB));
+
+    const params   = new URLSearchParams(window.location.search);
+    const roomCode = params.get("room");
+    const me       = JSON.parse(sessionStorage.getItem("dcg_player") || "null");
+    if (!roomCode || !me) { window.location.href = "index.html"; }
+
+    document.getElementById("wr-room-code").textContent = roomCode;
+
+    // Mark online
+    update(ref(db, `rooms/${roomCode}/players/${me.id}`), { online: true });
+
+    window.copyCode = function() {
+      navigator.clipboard?.writeText(roomCode);
+      const el = document.getElementById("wr-room-code");
+      el.style.color = "var(--sys-green)";
+      setTimeout(() => el.style.color = "", 1000);
+      showToast("Code copied!", false);
+    };
+
+    // Avatars for each slot — System assigns based on join order
+    const SLOT_AVATARS = ["◈", "◉", "◊", "○"];
+    const BOOT_QUIPS = [
+      "logged in",
+      "materialized from the void",
+      "arrived (reluctantly)",
+      "appeared, looking confused"
+    ];
+
+    let lastPlayerCount = 0;
+
+    onValue(ref(db, `rooms/${roomCode}`), snap => {
+      if (!snap.exists()) { window.location.href = "index.html"; return; }
+      const room = snap.val();
+
+      // If host already started — redirect everyone
+      if (room.status === "playing") {
+        window.location.href = `game.html?room=${roomCode}`;
+        return;
+      }
+
+      document.getElementById("wr-campaign").textContent = room.campaign || "Game Night Gone Wrong";
+
+      const players = Object.values(room.players || {}).sort((a,b) => (a.joinedAt||0) - (b.joinedAt||0));
+      const count   = players.length;
+
+      document.getElementById("slot-count").textContent = `${count} / 4 JOINED`;
+      document.getElementById("player-count-display").textContent = `${count}/4`;
+
+      // Render slots
+      const slotsEl = document.getElementById("player-slots");
+      slotsEl.innerHTML = Array.from({length: 4}, (_, i) => {
+        const p    = players[i];
+        const isMe = p?.id === me.id;
+        const isHost = p?.id === room.hostId;
+        if (!p) return `
+          <div class="player-slot empty">
+            <span class="slot-number">0${i+1}</span>
+            <div class="slot-empty-label">AWAITING PARTICIPANT...</div>
+          </div>`;
+        return `
+          <div class="player-slot filled ${isMe?"is-me":""} ${isHost?"is-host":""}">
+            <span class="slot-number">0${i+1}</span>
+            <div class="slot-avatar">${SLOT_AVATARS[i]}</div>
+            <div class="slot-info">
+              <div class="slot-name">${p.name}</div>
+              <div class="slot-tags">
+                <span class="slot-tag unclassed">[UNCLASSED]</span>
+                ${isHost ? `<span class="slot-tag host">HOST</span>` : ""}
+                ${isMe   ? `<span class="slot-tag you">YOU</span>`  : ""}
+                <span class="slot-tag ready">ONLINE</span>
+              </div>
+            </div>
+            <div class="online-dot"></div>
+          </div>`;
+      }).join("");
+
+      // Status text
+      const statusEl = document.getElementById("status-text");
+      if (count === 1) {
+        statusEl.innerHTML = `<span class="hi">SYSTEM:</span> Instance host confirmed. Awaiting additional participants...`;
+      } else if (count < 4) {
+        statusEl.innerHTML = `<span class="hi">SYSTEM:</span> <span class="warn">${count} participant${count>1?"s":""} detected.</span> Waiting for more — or host can begin now.`;
+      } else {
+        statusEl.innerHTML = `<span class="hi">SYSTEM:</span> <span class="ok">Party capacity reached. Instance ready to begin.</span>`;
+      }
+
+      // Show new player join toast
+      if (count > lastPlayerCount && lastPlayerCount > 0) {
+        const newPlayer = players[count - 1];
+        showToast(`${newPlayer.name} ${BOOT_QUIPS[count-1]}`, false);
+      }
+      lastPlayerCount = count;
+
+      // Begin zone
+      const beginEl = document.getElementById("begin-zone");
+      if (me.isHost) {
+        beginEl.innerHTML = `
+          <button class="btn-begin" id="btn-begin" onclick="beginInstance()">
+            [ INITIALIZE INSTANCE ]
+          </button>
+          <div class="begin-warning">
+            You can start with 1-4 players · Others can still join mid-game
+          </div>`;
+      } else {
+        beginEl.innerHTML = `
+          <div class="waiting-for-host">
+            // WAITING FOR HOST TO BEGIN THE INSTANCE<span class="blink">_</span>
+          </div>`;
+      }
+    });
+
+    window.beginInstance = async function() {
+      const btn = document.getElementById("btn-begin");
+      if (btn) { btn.disabled = true; btn.textContent = "[ INITIALIZING... ]"; }
+      await update(ref(db, `rooms/${roomCode}`), { status: "playing" });
+      window.location.href = `game.html?room=${roomCode}`;
+    };
+
+    function showToast(msg, isError) {
+      let t = document.getElementById("__toast");
+      if (!t) { t = document.createElement("div"); t.id = "__toast"; t.className = "toast"; document.body.appendChild(t); }
+      t.textContent = msg; t.className = "toast" + (isError ? " error" : " success");
+      requestAnimationFrame(() => t.classList.add("show"));
+      setTimeout(() => t.classList.remove("show"), 3000);
+    }
+  </script>
+</body>
+</html>

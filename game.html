@@ -216,8 +216,8 @@
       // Load private history from my player data
       syncPrivateLog(myPlayer?.privateLog||{});
 
-      // Host triggers opening narration
-      if (me.isHost && Object.keys(roomData.log||{}).length===0 && !isDMThinking) {
+      // Host triggers opening narration only when status is playing
+      if (me.isHost && roomData.status==='playing' && Object.keys(roomData.log||{}).length===0 && !isDMThinking) {
         runOpening();
       }
     });
