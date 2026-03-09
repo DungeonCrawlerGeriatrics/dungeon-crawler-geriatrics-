@@ -616,166 +616,198 @@
 .depth-pip.boss.active { border-color: var(--sys-red); background: rgba(255,51,85,0.08); color: var(--sys-red); box-shadow: 0 0 8px rgba(255,51,85,0.2); }
 
 
+
 /* ============================================================
-   MOBILE — full rewrite below 768px
-   Three-panel → bottom-tab navigation
-   Each panel scrolls independently
-   Input pinned to bottom
+   MOBILE — ≤768px
+   Single-panel view with bottom tab nav
+   No horizontal overflow, everything fits viewport width
    ============================================================ */
 
 @media (max-width: 768px) {
 
-  /* Kill the fixed-height viewport lock */
-  html, body {
-    height: auto !important;
+  /* ── Root: kill all fixed heights and overflow locks ── */
+  html {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  body {
+    overflow-x: hidden;
+    width: 100%;
     min-height: 100dvh;
-    overflow: auto !important;
   }
 
   .game-page {
-    height: auto !important;
+    height: auto;
     min-height: 100dvh;
-    overflow: visible !important;
-    display: flex;
-    flex-direction: column;
+    overflow: visible;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
-  /* Header — compact */
+  /* ── Header: compact, no overflow ── */
   .game-header {
-    padding: 0.4rem 0.75rem;
-    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    gap: 0.4rem;
     position: sticky;
     top: 0;
     z-index: 100;
+    flex-wrap: nowrap;
+    overflow: hidden;
   }
-  .gh-brand-title { font-size: 0.65rem; }
+  .gh-brand-title { font-size: 0.6rem; }
   .gh-location {
-    font-size: 0.6rem;
-    padding: 0.25rem 0.5rem;
+    font-size: 0.58rem;
+    padding: 0.2rem 0.4rem;
     max-width: none;
     flex: 1;
     min-width: 0;
+    overflow: hidden;
   }
-  .gh-room { font-size: 0.58rem; }
-  .gh-room span { font-size: 0.75rem; }
+  .gh-room { font-size: 0.55rem; white-space: nowrap; }
+  .gh-room span { font-size: 0.7rem; }
   .gh-pips { display: none; }
 
-  /* Layout — single column, panels toggled by JS class */
+  /* ── Layout: kill grid entirely on mobile ── */
   .game-layout {
     display: block !important;
-    flex: 1;
+    width: 100% !important;
+    max-width: 100vw !important;
     overflow: visible !important;
-    min-height: 0;
-    padding-bottom: 100px; /* space for bottom nav + input */
+    grid-template-columns: none !important;
+    /* Space for: fixed input zone (~110px) + bottom nav (56px) */
+    padding-bottom: 170px;
   }
 
-  /* All panels hidden by default, shown when active */
-  .panel {
+  /* ── Panels: all hidden, shown one at a time ── */
+  .panel-left,
+  .panel-center,
+  .panel-right {
     display: none !important;
-    flex-direction: column;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box;
+    border: none !important;
   }
   .panel.mobile-active {
     display: flex !important;
-    min-height: calc(100dvh - 120px);
+    flex-direction: column;
+    min-height: calc(100dvh - 56px);
   }
 
-  /* ── LEFT panel (Party) — scrollable list ── */
-  .panel-left {
-    overflow-y: auto !important;
-    padding: 0.75rem;
-  }
-  .panel-hd {
-    font-size: 0.6rem;
-    padding: 0.5rem 0;
-    margin-bottom: 0.5rem;
+  /* ── LEFT panel: party list ── */
+  .panel-left.mobile-active {
+    overflow-y: auto;
+    padding: 0.6rem;
   }
 
-  /* ── CENTER panel (Group log + input) ── */
-  .panel-center {
-    overflow: visible !important;
-    min-height: 0;
+  /* ── CENTER panel: group log ── */
+  .panel-center.mobile-active {
+    overflow: visible;
   }
-  .channel-tabs { display: none; } /* tabs replaced by bottom nav on mobile */
-
+  .channel-tabs { display: none; }
   .log-area {
     overflow-y: auto !important;
+    padding: 0.75rem 0.6rem;
     flex: 1;
-    padding: 0.75rem;
-    min-height: calc(100dvh - 220px);
-    max-height: none !important;
+    /* Tall enough to scroll through content above fixed input */
+    min-height: calc(100dvh - 170px);
   }
 
-  /* Input zone — sticky to bottom above mobile nav */
+  /* ── Input zone: fixed above bottom nav ── */
   .input-zone {
     position: fixed !important;
-    bottom: 56px; /* above bottom nav */
-    left: 0; right: 0;
+    bottom: 56px;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box;
     z-index: 90;
     background: var(--sys-bg);
     border-top: 1px solid var(--sys-border);
-    padding: 0.5rem 0.75rem;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.6);
+    padding: 0.4rem 0.6rem;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.7);
   }
-  .turn-indicator {
-    margin-bottom: 0.35rem;
-    font-size: 0.6rem;
+  /* Hide input zone when not on group tab */
+  .input-zone.mobile-hidden { display: none !important; }
+
+  .turn-indicator { margin-bottom: 0.3rem; }
+  .turn-chip { font-size: 0.52rem; padding: 0.15rem 0.35rem; }
+  .quick-actions {
+    gap: 0.25rem;
+    margin-bottom: 0.3rem;
+    flex-wrap: wrap;
   }
-  .turn-chip { font-size: 0.55rem; padding: 0.2rem 0.4rem; }
-  .quick-actions { gap: 0.3rem; margin-bottom: 0.35rem; flex-wrap: wrap; }
-  .qa-btn { font-size: 0.58rem; padding: 0.25rem 0.4rem; }
-  .input-row { gap: 0.4rem; }
-  .action-textarea { min-height: 40px; font-size: 0.88rem; padding: 0.4rem 0.6rem; }
-  .btn-send { font-size: 0.6rem; padding: 0.35rem 0.6rem; }
+  .qa-btn { font-size: 0.55rem; padding: 0.2rem 0.35rem; }
+  .input-row { gap: 0.35rem; }
+  .action-textarea {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+    min-height: 38px;
+  }
+  .btn-send { font-size: 0.58rem; padding: 0.3rem 0.5rem; }
+  .roll-blocker { margin-bottom: 0.3rem; }
 
-  /* Roll blocker — full width on mobile */
-  .roll-blocker { margin: 0 0 0.4rem; }
-
-  /* ── RIGHT panel (Private/DM) ── */
-  .panel-right {
-    overflow-y: auto !important;
-    padding-bottom: 160px; /* space for fixed input zone */
+  /* ── RIGHT panel: private/DM ── */
+  .panel-right.mobile-active {
+    overflow-y: auto;
+    padding-bottom: 10px;
   }
   .private-log {
     max-height: none !important;
     overflow-y: visible !important;
-    flex: 1;
   }
+
+  /* Private input: fixed above bottom nav when on private tab */
   .private-input-zone {
     position: fixed !important;
     bottom: 56px;
-    left: 0; right: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box;
     z-index: 90;
     background: var(--sys-bg);
     border-top: 1px solid rgba(155,109,255,0.3);
-    padding: 0.5rem 0.75rem;
-    display: none; /* shown only when right panel active */
+    padding: 0.4rem 0.6rem;
+    display: none;
   }
-  .panel-right.mobile-active .private-input-zone {
-    display: block !important;
-  }
+  .private-input-zone.mobile-visible { display: block !important; }
 
-  /* Stat modal — full screen on mobile */
-  .stat-modal-overlay {
-    padding: 0 !important;
+  /* PM tabs: horizontal scroll */
+  .pm-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .pm-tabs::-webkit-scrollbar { display: none; }
+  .pm-tab { font-size: 0.58rem; padding: 0.45rem 0.55rem; }
+
+  /* ── Stat modal: full screen ── */
+  .stat-modal-overlay { padding: 0 !important; align-items: flex-start; }
   .stat-modal {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100vw !important;
     height: 100dvh !important;
     max-height: 100dvh !important;
     border-radius: 0 !important;
+    margin: 0 !important;
     overflow-y: auto;
   }
 
-  /* Dice tray — full width bottom sheet */
+  /* ── Dice tray: bottom sheet ── */
   .dice-overlay {
     position: fixed !important;
     bottom: 56px !important;
     left: 0 !important;
     right: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
     top: auto !important;
+    width: 100% !important;
+    max-width: 100vw !important;
     border-radius: 0 !important;
     border-left: none !important;
     border-right: none !important;
@@ -783,29 +815,38 @@
     max-height: 70dvh;
     overflow-y: auto;
     z-index: 200 !important;
+    box-sizing: border-box;
   }
   .dice-fab {
-    bottom: 64px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    bottom: 66px !important;
+    left: 12px !important;
     z-index: 150 !important;
   }
 
-  /* Hero cards — slightly more compact */
-  .hero-card { padding: 0.6rem; }
-  .stat-box { padding: 0.35rem 0.2rem; }
-  .stat-val { font-size: 1.1rem; }
+  /* ── Hero cards: compact ── */
+  .hero-card { padding: 0.55rem; }
+  .stat-box { padding: 0.3rem 0.15rem; }
+  .stat-val { font-size: 1rem; }
+  .stat-key { font-size: 0.52rem; }
 
-  /* ── BOTTOM NAV — Mobile tab switcher ── */
+  /* ── Session / depth: hide on mobile (too cramped) ── */
+  .session-section,
+  .depth-section { display: none; }
+
+  /* ── Bottom nav ── */
   .mobile-nav {
     display: flex !important;
     position: fixed;
-    bottom: 0; left: 0; right: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
     height: 56px;
     background: rgba(5,8,18,0.97);
     border-top: 1px solid var(--sys-border);
     z-index: 110;
     backdrop-filter: blur(10px);
+    box-sizing: border-box;
   }
   .mobile-nav-btn {
     flex: 1;
@@ -813,25 +854,27 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
+    gap: 0.1rem;
     font-family: 'Share Tech Mono', monospace;
-    font-size: 0.48rem;
-    letter-spacing: 0.08em;
+    font-size: 0.45rem;
+    letter-spacing: 0.06em;
     color: var(--sys-text-faint);
     background: none;
     border: none;
     outline: none;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: color 0.15s;
     position: relative;
     padding: 0;
+    -webkit-tap-highlight-color: transparent;
   }
-  .mobile-nav-btn .nav-icon { font-size: 1.1rem; line-height: 1; }
+  .mobile-nav-btn .nav-icon { font-size: 1.05rem; line-height: 1; }
   .mobile-nav-btn.active { color: var(--sys-glow); }
   .mobile-nav-btn.active-priv { color: var(--sys-purple); }
   .mobile-nav-unread {
     position: absolute;
-    top: 6px; right: calc(50% - 14px);
+    top: 5px;
+    right: calc(50% - 16px);
     width: 7px; height: 7px;
     border-radius: 50%;
     background: var(--sys-red);
@@ -840,28 +883,17 @@
   }
   .mobile-nav-unread.visible { display: block; }
 
-  /* Waiting zone compact */
-  .waiting-bar { padding: 0.25rem 0; }
-  .waiting-text { font-size: 0.62rem; }
+  /* Waiting zone */
+  .waiting-text { font-size: 0.6rem; }
 
-  /* PM tabs on right panel — show as horizontal scroll tabs */
-  .pm-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 0 0.5rem;
-  }
-  .pm-tabs::-webkit-scrollbar { display: none; }
-  .pm-tab { font-size: 0.6rem; padding: 0.5rem 0.6rem; }
-
-  /* Session info — hide on mobile (too cramped) */
-  .session-section { display: none; }
-  .ragequit-btn { font-size: 0.6rem; padding: 0.4rem; }
 }
 
-/* Tablet — keep desktop layout but allow scrolling */
+/* ── Desktop: hide mobile nav, show all panels ── */
 @media (min-width: 769px) {
   .mobile-nav { display: none !important; }
-  .panel { display: flex !important; }
+  .panel-left,
+  .panel-center,
+  .panel-right { display: flex !important; }
+  .input-zone { position: static !important; display: block !important; }
+  .private-input-zone { position: static !important; display: block !important; }
 }
