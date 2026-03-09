@@ -733,6 +733,22 @@
       roundCount = roomData.roundCount || 1;
       depth      = roomData.depth      || 1;
 
+      // Auto-skip offline/fallen players — if current actor is offline, advance turn
+      const onlinePlayers = players.filter(p => p.online && (p.hp??1) > 0);
+      if (onlinePlayers.length > 0 && players[turnIndex] && !players[turnIndex].online) {
+        let skipped = turnIndex;
+        let attempts = 0;
+        while ((!players[skipped]?.online || (players[skipped]?.hp??1) <= 0) && attempts < players.length) {
+          skipped = (skipped + 1) % players.length;
+          attempts++;
+        }
+        if (skipped !== turnIndex) {
+          turnIndex = skipped;
+          // Only host updates Firebase to avoid race condition
+          if (me.isHost) update(ref(db, `rooms/${roomCode}`), { turnIndex: skipped });
+        }
+      }
+
       document.getElementById("gh-location-text").textContent = roomData.location || "Unknown";
       document.getElementById("sess-turn").textContent   = turnCount+1;
       document.getElementById("sess-round").textContent  = roundCount;
