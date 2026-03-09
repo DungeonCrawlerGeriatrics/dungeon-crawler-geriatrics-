@@ -476,6 +476,7 @@
         renderedPrivateKeys.add(key);
         const div = document.createElement("div");
         div.className = `private-entry ${entry.from==="dm"?"from-dm":"from-me"}`;
+        if (entry.from === "dm" && activePmTab !== "dm") playDing();
         div.innerHTML = `
           <div class="pe-who">${entry.from==="dm"?"🔮 DM (PRIVATE)":"🔒 YOU (PRIVATE)"}</div>
           <div class="pe-body">${entry.from==="dm"?formatDM(entry.text):entry.text}</div>`;
@@ -777,21 +778,32 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
 
 
     // ── Notification Ding ──────────────────────────────────
+    let _audioCtx = null;
+    function getAudioCtx() {
+      if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      return _audioCtx;
+    }
+    // Unlock audio on first interaction
+    document.addEventListener('click', () => getAudioCtx(), { once: true });
+    document.addEventListener('keydown', () => getAudioCtx(), { once: true });
+
     function playDing() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o1 = ctx.createOscillator();
-        const o2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        o1.connect(gain); o2.connect(gain); gain.connect(ctx.destination);
-        o1.type = 'sine'; o1.frequency.setValueAtTime(880, ctx.currentTime);
-        o1.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.08);
-        o2.type = 'sine'; o2.frequency.setValueAtTime(1320, ctx.currentTime + 0.05);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-        o1.start(ctx.currentTime); o1.stop(ctx.currentTime + 0.5);
-        o2.start(ctx.currentTime + 0.05); o2.stop(ctx.currentTime + 0.5);
-      } catch(e) {}
+        const ctx = getAudioCtx();
+        const t = ctx.currentTime;
+        [[660, 0, 0.3], [880, 0.12, 0.25], [1100, 0.22, 0.2]].forEach(([freq, delay, dur]) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'sine';
+          o.frequency.setValueAtTime(freq, t + delay);
+          g.gain.setValueAtTime(0, t + delay);
+          g.gain.linearRampToValueAtTime(0.25, t + delay + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + delay + dur);
+          o.start(t + delay); o.stop(t + delay + dur);
+        });
+      } catch(e) { console.warn('ding failed', e); }
     }
     // ── PM Tab System ──────────────────────────────────────
     let activePmTab = "dm";
