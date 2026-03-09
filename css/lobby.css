@@ -1,134 +1,138 @@
 /* ============================================================
-   LOBBY PAGE STYLES
+   LOBBY — The System activation screen
    ============================================================ */
 
 .lobby-page {
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(139,26,26,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 20% 80%, rgba(201,168,76,0.06) 0%, transparent 50%);
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5rem 1.5rem 3rem;
+  padding: 2rem 1rem;
   position: relative;
+  overflow: hidden;
 }
 
-/* â”€â”€ Sigil â”€â”€ */
+/* Animated grid background */
+.lobby-page::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+  animation: grid-drift 20s linear infinite;
+}
+@keyframes grid-drift { to { background-position: 40px 40px; } }
+
 .lobby-wrap {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 560px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
+  gap: 1.5rem;
 }
 
-.sigil-wrap {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.5rem;
+/* ── System header ── */
+.sys-header {
+  text-align: center;
+  width: 100%;
 }
 
-.sigil-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 1px solid var(--gold-dim);
-  animation: sigil-spin 12s linear infinite;
-}
-.sigil-ring.outer { width: 100px; height: 100px; border-style: dashed; }
-.sigil-ring.inner { width: 70px;  height: 70px;  animation-direction: reverse; animation-duration: 8s; }
-
-@keyframes sigil-spin { to { transform: rotate(360deg); } }
-
-.sigil-icon {
-  font-size: 2.6rem;
-  filter: drop-shadow(0 0 16px rgba(201,168,76,0.7));
-  animation: sigil-pulse 3s ease-in-out infinite;
-  position: relative;
-  z-index: 1;
-}
-@keyframes sigil-pulse {
-  0%,100% { filter: drop-shadow(0 0 10px rgba(201,168,76,0.5)); }
-  50%      { filter: drop-shadow(0 0 28px rgba(201,168,76,0.9)); }
+.sys-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.4em;
+  color: var(--sys-glow-dim);
+  margin-bottom: 0.5rem;
 }
 
-/* â”€â”€ Title â”€â”€ */
-.title-main {
+.sys-title {
   font-family: 'Cinzel Decorative', serif;
-  font-size: clamp(1.8rem, 6vw, 3rem);
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
   font-weight: 900;
-  color: var(--gold-bright);
-  text-align: center;
-  text-shadow: 0 0 40px rgba(201,168,76,0.4), 2px 3px 0 rgba(0,0,0,0.8);
-  line-height: 1.15;
-  letter-spacing: 0.03em;
-  margin-bottom: 0.75rem;
+  color: var(--sys-text);
+  line-height: 1.1;
+  text-shadow: 0 0 30px rgba(0,212,255,0.2), 0 0 60px rgba(0,212,255,0.1);
+  margin-bottom: 0.35rem;
 }
 
-.title-rule {
-  color: var(--gold-dim);
-  font-size: 1.2rem;
-  margin: 0.25rem 0;
-  letter-spacing: 0.5em;
+.sys-title span { color: var(--sys-glow); }
+
+.sys-subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--sys-text-dim);
+  letter-spacing: 0.2em;
 }
 
-.title-tagline {
-  font-size: 0.9rem;
-  color: var(--text-dim);
-  text-align: center;
-  font-style: italic;
-  line-height: 1.7;
-  margin-bottom: 2.5rem;
+/* ── Boot message ── */
+.boot-msg {
+  width: 100%;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid var(--sys-border);
+  border-left: 3px solid var(--sys-glow-dim);
+  padding: 1rem 1.25rem;
 }
 
-/* â”€â”€ Lobby Card â”€â”€ */
+.boot-line {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--sys-text-dim);
+  letter-spacing: 0.05em;
+  line-height: 2;
+}
+.boot-line .hi { color: var(--sys-glow); }
+.boot-line .warn { color: var(--sys-gold); }
+.boot-line .err  { color: var(--sys-red); }
+
+/* ── Main card ── */
 .lobby-card {
   width: 100%;
-  background: linear-gradient(160deg, rgba(26,21,16,0.97), rgba(14,11,7,0.97));
-  border: 1px solid var(--border-gold);
-  padding: 2.5rem 2rem;
+  background: rgba(10,12,16,0.95);
+  border: 1px solid var(--sys-border2);
+  padding: 2rem 1.75rem;
   position: relative;
-  clip-path: polygon(16px 0%, 100% 0%, calc(100% - 16px) 100%, 0% 100%);
-  margin-bottom: 1rem;
 }
 
 .lobby-card::before {
   content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(160deg, rgba(201,168,76,0.06), transparent 50%);
-  pointer-events: none;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--sys-glow-dim), transparent);
 }
 
 .lobby-section { width: 100%; }
 
-.section-heading {
-  font-family: 'Cinzel', serif;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--gold);
-  letter-spacing: 0.15em;
-  margin-bottom: 0.3rem;
+.section-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.25em;
+  color: var(--sys-glow);
+  margin-bottom: 0.25rem;
 }
 
 .section-desc {
   font-size: 0.82rem;
-  color: var(--text-dim);
+  color: var(--sys-text-dim);
   font-style: italic;
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.25rem;
+  line-height: 1.6;
 }
+
+.input-group { margin-bottom: 1rem; }
 
 .lobby-or {
   text-align: center;
-  font-family: 'Cinzel', serif;
-  font-size: 0.7rem;
-  color: var(--text-faint);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--sys-text-faint);
   letter-spacing: 0.3em;
   margin: 1.5rem 0;
   position: relative;
@@ -137,70 +141,40 @@
 .lobby-or::after {
   content: '';
   position: absolute;
-  top: 50%;
-  width: 35%;
+  top: 50%; width: 40%;
   height: 1px;
-  background: var(--border);
+  background: var(--sys-border);
 }
 .lobby-or::before { left: 0; }
 .lobby-or::after  { right: 0; }
 
-/* â”€â”€ Inputs â”€â”€ */
-.input-group {
-  margin-bottom: 1rem;
-}
-
-.input-label {
-  display: block;
-  font-family: 'Cinzel', serif;
-  font-size: 0.65rem;
-  letter-spacing: 0.2em;
-  color: var(--text-dim);
-  margin-bottom: 0.4rem;
-}
-.optional { color: var(--text-faint); font-size: 0.6rem; }
-
-.text-input {
-  width: 100%;
-  background: rgba(0,0,0,0.5);
-  border: 1px solid var(--border-gold);
-  color: var(--text);
-  font-family: 'IM Fell English', serif;
-  font-size: 1rem;
-  padding: 0.65rem 0.9rem;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.text-input:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 12px rgba(201,168,76,0.2);
-}
-.text-input::placeholder { color: var(--text-faint); font-style: italic; }
-
 .room-code-input {
-  font-family: 'Cinzel', serif;
-  font-size: 1.6rem;
-  letter-spacing: 0.4em;
+  font-size: 1.8rem;
   text-align: center;
-  text-transform: uppercase;
+  letter-spacing: 0.5em;
+  padding: 0.75rem;
 }
 
-.btn-icon { font-size: 1rem; }
+.error-msg {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--sys-red);
+  min-height: 1.4rem;
+  letter-spacing: 0.08em;
+  margin-top: 0.5rem;
+  text-align: center;
+}
 
-.lobby-section .btn { width: 100%; margin-top: 0.25rem; }
-
-/* â”€â”€ Footer â”€â”€ */
+/* ── Footer ── */
 .lobby-footer {
-  font-family: 'Cinzel', serif;
-  font-size: 0.6rem;
-  color: var(--text-faint);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--sys-text-faint);
   letter-spacing: 0.2em;
   text-align: center;
-  margin-top: 0.5rem;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 480px) {
-  .lobby-card { padding: 2rem 1.25rem; clip-path: none; }
-  .title-main { font-size: 1.8rem; }
+  .lobby-card { padding: 1.5rem 1.25rem; }
 }
