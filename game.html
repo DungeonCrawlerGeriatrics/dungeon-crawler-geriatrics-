@@ -775,6 +775,24 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       });
     });
 
+
+    // ── Notification Ding ──────────────────────────────────
+    function playDing() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o1 = ctx.createOscillator();
+        const o2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        o1.connect(gain); o2.connect(gain); gain.connect(ctx.destination);
+        o1.type = 'sine'; o1.frequency.setValueAtTime(880, ctx.currentTime);
+        o1.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.08);
+        o2.type = 'sine'; o2.frequency.setValueAtTime(1320, ctx.currentTime + 0.05);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+        o1.start(ctx.currentTime); o1.stop(ctx.currentTime + 0.5);
+        o2.start(ctx.currentTime + 0.05); o2.stop(ctx.currentTime + 0.5);
+      } catch(e) {}
+    }
     // ── PM Tab System ──────────────────────────────────────
     let activePmTab = "dm";
     let pmUnreadCounts = {};
@@ -876,6 +894,7 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
             pmUnreadCounts[p.id] = (pmUnreadCounts[p.id] || 0) + 1;
             const dot = document.getElementById(`pm-unread-${p.id}`);
             if (dot) dot.classList.add("visible");
+            playDing();
           }
         });
       });
