@@ -476,6 +476,21 @@
       padding: 0.4rem 0.9rem 0.2rem;
     }
 </style>
+<style>
+    .skill-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid var(--sys-border);
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .skill-entry:last-child { border-bottom: none; }
+    .skill-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .skill-name { font-size: 0.68rem; color: var(--sys-gold); letter-spacing: 0.05em; }
+    .skill-desc { font-size: 0.58rem; color: var(--sys-text-dim); margin-top: 0.15rem; line-height: 1.4; }
+    .skill-empty { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--sys-text-faint); letter-spacing: 0.1em; font-style: italic; }
+</style>
 </head>
 <body class="game-page">
 
@@ -1089,6 +1104,25 @@
       const locM=text.match(/(?:you are now in|entering|arrived at|welcome to)\s+([^.\n,!]+)/i);
       if(locM){const loc=locM[1].trim().replace(/^the /i,"");if(loc.length>3&&loc.length<60)updates["location"]=loc;}
 
+
+      // Skill acquisition: [SYSTEM: New skill acquired — Skill Name: description]
+      const skillRe = /New skill acquired[^—\n]*?[—–-]\s*([^:\n\]]+):?([^\]]*)/gi;
+      while ((m = skillRe.exec(text)) !== null) {
+        const skillName = m[1].trim();
+        const skillDesc = m[2].trim();
+        const key = skillName.toLowerCase().replace(/\s+/g,'_');
+        // Find who earned it — default to current actor
+        const earner = actor || players[turnIndex];
+        if (earner) {
+          updates[`players/${earner.id}/skills/${key}`] = {
+            name: skillName,
+            desc: skillDesc || '',
+            icon: '⚡',
+            earnedAt: Date.now()
+          };
+        }
+      }
+
       if(Object.keys(updates).length) await update(ref(db,`rooms/${roomCode}`),updates);
     }
 
@@ -1459,6 +1493,13 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
         ? statuses.map(s => `<span class="pill pill-${s}">${s}</span>`).join("")
         : `<span style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--sys-text-faint);letter-spacing:.1em">NO ACTIVE CONDITIONS</span>`;
 
+      
+      // Skills
+      const skills = Object.values(p.skills || {});
+      document.getElementById("smd-skills").innerHTML = skills.length
+        ? skills.map(s => '<div class="skill-entry"><span class="skill-icon">' + (s.icon||'⚡') + '</span><div><div class="skill-name">' + s.name + '</div>' + (s.desc ? '<div class="skill-desc">' + s.desc + '</div>' : '') + '</div></div>').join("")
+        : '<div class="skill-empty">No skills yet — earn them through actions</div>';
+
       document.getElementById("stat-modal-overlay").classList.add("open");
     };
 
@@ -1785,9 +1826,24 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       showToast('Copied', false);
     };
 
-    window.leaveGame = function(){
+    window.leaveGame = async function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
-        update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
+        // If it's this player's turn, advance to next online player first
+        if(players[turnIndex]?.id === me.id) {
+          const onlinePlayers = players.filter(p => p.online && p.id !== me.id);
+          if (onlinePlayers.length > 0) {
+            let next = (turnIndex + 1) % players.length;
+            // Skip offline players
+            let attempts = 0;
+            while (players[next]?.id === me.id && attempts < players.length) {
+              next = (next + 1) % players.length;
+              attempts++;
+            }
+            await update(ref(db, `rooms/${roomCode}`), { turnIndex: next });
+          }
+        }
+        await update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false, hp:0});
+        await writeGroupLog({type:'sys', sclass:'', text:`SYSTEM: ${myPlayer?.name||'A player'} has disconnected. They tripped into a pit.`});
         sessionStorage.removeItem("dcg_player");
         window.location.href="index.html";
       }
@@ -1811,6 +1867,10 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       <div class="stat-modal-grid" id="smd-grid"></div>
       <div class="stat-modal-bars" id="smd-bars"></div>
       <div class="stat-modal-statuses" id="smd-statuses"></div>
+      <div style="margin-top:.75rem;border-top:1px solid var(--sys-border);padding-top:.75rem;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;letter-spacing:.2em;color:var(--sys-text-dim);margin-bottom:.5rem;">// SKILLS & ABILITIES</div>
+        <div id="smd-skills"></div>
+      </div>
     </div>
   </div>
 
