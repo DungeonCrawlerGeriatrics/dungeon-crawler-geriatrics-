@@ -1426,12 +1426,15 @@ OPENING SCENE RULES — follow these exactly:
     // ── System prompts ───────────────────────────────────────
     function buildSysPrompt() {
       const partyDesc = players.map(p=>{
-        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
-        const notes = p.id === me.id ? "" : (p.notes ? ` | Notes (private): "${p.notes}"` : "");
+        const inv = Object.values(p.inventory||{});
+        const invList = inv.length
+          ? inv.map(i => `${i.name}${i.desc ? ` (${i.desc})` : ''}`).join(", ")
+          : "nothing";
+        const notes = p.id === me.id ? "" : (p.notes ? ` | Notes (DM-visible): "${p.notes}"` : "");
         const backstory = p.backstory ? `\n  Backstory: ${p.backstory.slice(0,300)}...` : "";
         const skills = Object.values(p.skills||{}).map(s=>s.name).join(", ");
-        const skillStr = skills ? ` | Starting skills: ${skills}` : "";
-        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | Inventory: ${inv}${skillStr}${notes}${backstory}`;
+        const skillStr = skills ? ` | Skills: ${skills}` : "";
+        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | INVENTORY: [${invList}]${skillStr}${notes}${backstory}`;
       }).join("\n");
       return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
 
@@ -1457,6 +1460,13 @@ GOOD: The left passage exhales cold air. Something scrapes stone in the dark.
 You control: the world, monsters, NPCs, environment, consequences, loot, System notifications.
 You do NOT control: what players say, think, feel, or decide to do next.
 End every response with the world waiting — not with the players reacting to it.
+
+CRITICAL RULE — INVENTORY INTEGRITY:
+The INVENTORY lists above are the single source of truth. ONLY reference items that appear there.
+NEVER invent items a player is carrying — no phantom journals, no imaginary coins, no made-up weapons.
+If you want a player to HAVE something, give it to them explicitly with {LOOT: item — desc} so it saves.
+If an item moves between players, use {TRANSFER: item — from:Name to:Name}.
+Referencing items that don't exist in the inventory list breaks immersion and player trust.
 
 CLASS TRACKING (secret — don't tell players):
 Watch behavior patterns. After 4-6 actions showing clear tendency, assign a class dramatically.
@@ -1505,23 +1515,36 @@ NOT every action needs a roll. Don't roll for: looking around, talking normally,
     }
 
     function buildPrivateSysPrompt() {
-      const partyDesc = players.map(p=>`- ${p.name}: Class ${p.heroClass||"???"}, HP ${p.hp??p.maxHp}/${p.maxHp}`).join("\n");
+      const partyDesc = players.map(p => {
+        const inv = Object.values(p.inventory||{});
+        const invList = inv.length
+          ? inv.map(i => `${i.name}${i.desc ? ` (${i.desc})` : ''}`).join(", ")
+          : "nothing";
+        const skills  = Object.values(p.skills||{}).map(s=>s.name).join(", ") || "none";
+        return `- ${p.name}: Class ${p.heroClass||"???"}, HP ${p.hp??p.maxHp}/${p.maxHp}\n  INVENTORY: ${invList}\n  SKILLS: ${skills}`;
+      }).join("\n");
+
       return `You are the DM for Dungeon Crawler Geriatrics. A player is whispering to you PRIVATELY.
 
-PARTY: ${partyDesc}
+PARTY INVENTORIES (authoritative — these are the ONLY items that exist):
+${partyDesc}
 Location: ${roomData?.location||"Unknown"} | Depth: ${depth}
+
+CRITICAL INVENTORY RULE: You may ONLY reference items that appear in the inventory lists above. Do NOT invent, mention, or imply the existence of any item not listed. If a player asks about an item they don't have, tell them they don't have it. Never hallucinate journal entries, letters, weapons, coins, rations, or any object not in the list.
 
 This is a PRIVATE channel. Only this player sees your response. You can:
 - Reveal secrets the party doesn't know
-- Give them a private quest or opportunity  
-- Let them make a deal (maybe shady)
+- Give them a private quest or opportunity
+- Let them make a shady deal
 - Tell them something about another player's behavior you've noticed
-- Give them a private item or skill
-- Let them find something they might not share
+- Give them a NEW item (but tag it properly so it actually gets added)
+- Let them find something they might not share with the party
 
-CRITICAL — ITEM TAGGING: If you give or reveal ANY items to this player, you MUST tag each one with {LOOT: item name — funny description} so their inventory updates automatically. Do NOT just list items in prose — always use the tag. Example: {LOOT: Ornate Brass Key — warm to the touch, purpose unknown, feels significant}
+GIVING NEW ITEMS: Tag every new item with {LOOT: item name — description} so inventory updates automatically. Do NOT describe items in prose without tagging them — they won't be saved.
 
-If your response causes something visible to the group, include [public: description of what others would actually see] — posts to group log, third person. Strip it from private response.
+TAKING/MOVING ITEMS: Use {TRANSFER: item name — from:PlayerName to:PlayerName} to move items between players.
+
+If your response causes something visible to the group, include [public: what others would see — third person]. Strip it from the private response.
 
 Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
     }
