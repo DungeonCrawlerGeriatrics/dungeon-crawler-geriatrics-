@@ -1,0 +1,328 @@
+/* ============================================================
+   HERO SELECT PAGE STYLES
+   ============================================================ */
+
+.heroselect-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 100% 50% at 50% 0%, rgba(139,26,26,0.1) 0%, transparent 55%);
+}
+
+/* ── Room Bar ── */
+.room-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 2rem;
+  background: rgba(8,7,5,0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.room-bar-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.25em;
+  color: var(--text-faint);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.room-bar-value {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.room-bar-code {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.4rem;
+  color: var(--gold-bright);
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 16px rgba(201,168,76,0.5);
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid var(--border-gold);
+  color: var(--gold-dim);
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+  outline: none;
+}
+.copy-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+.room-bar-center { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex-direction: row; align-items: center; gap: 0.75rem; }
+
+.player-pips { display: flex; gap: 0.4rem; }
+.player-pip {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+  background: var(--stone-mid);
+  transition: all 0.2s;
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+.player-pip.filled { border-color: var(--gold-dim); background: rgba(201,168,76,0.1); color: var(--gold); }
+.player-pip.me     { border-color: var(--gold); box-shadow: 0 0 8px rgba(201,168,76,0.4); }
+
+/* ── Main ── */
+.heroselect-main {
+  position: relative;
+  z-index: 1;
+  padding: 2rem 2rem 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  flex: 1;
+}
+
+.hs-header { text-align: center; }
+
+.hs-title {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  font-weight: 700;
+  color: var(--gold-bright);
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 30px rgba(201,168,76,0.3);
+}
+
+.hs-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ── Hero Grid ── */
+.hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 1000px;
+}
+
+@media (max-width: 900px)  { .hero-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px)  { .hero-grid { grid-template-columns: 1fr; } }
+
+/* ── Hero Card ── */
+.hero-card {
+  border: 2px solid var(--border);
+  background: linear-gradient(160deg, rgba(26,21,16,0.95), rgba(10,8,5,0.95));
+  padding: 1.5rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  text-align: center;
+}
+
+.hero-card:hover:not(.taken):not(.selected) {
+  border-color: var(--gold-dim);
+  background: linear-gradient(160deg, rgba(36,29,18,0.98), rgba(18,14,8,0.98));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.hero-card.selected {
+  border-color: var(--gold);
+  background: linear-gradient(160deg, rgba(40,30,10,0.98), rgba(20,15,5,0.98));
+  box-shadow: 0 0 24px rgba(201,168,76,0.25), inset 0 0 20px rgba(201,168,76,0.05);
+}
+
+.hero-card.taken {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+.hero-card.my-pick { pointer-events: none; }
+
+.card-class-badge {
+  position: absolute;
+  top: -1px; right: 12px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid;
+  border-top: none;
+}
+
+.hero-card.warrior-card .card-class-badge { border-color: var(--warrior); color: var(--warrior); background: rgba(231,76,60,0.1); }
+.hero-card.mage-card    .card-class-badge { border-color: var(--mage);    color: var(--mage);    background: rgba(165,105,189,0.1); }
+.hero-card.rogue-card   .card-class-badge { border-color: var(--rogue);   color: var(--rogue);   background: rgba(39,174,96,0.1); }
+.hero-card.paladin-card .card-class-badge { border-color: var(--paladin); color: var(--paladin); background: rgba(240,180,41,0.1); }
+
+.hero-avatar-lg {
+  font-size: 3.5rem;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 0 12px currentColor);
+  line-height: 1;
+}
+
+.hero-card-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+.hero-card.warrior-card .hero-card-name { color: var(--warrior); }
+.hero-card.mage-card    .hero-card-name { color: var(--mage);    }
+.hero-card.rogue-card   .hero-card-name { color: var(--rogue);   }
+.hero-card.paladin-card .hero-card-name { color: var(--paladin); }
+
+.hero-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.hero-stat-pill {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgba(201,168,76,0.2);
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+
+.hero-abilities {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+}
+.hero-ability {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 0.2rem 0.4rem;
+  border-left: 2px solid var(--border);
+}
+.hero-card.selected .hero-ability { border-left-color: var(--gold-dim); }
+
+.bar-label-sm {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  color: var(--text-faint);
+  letter-spacing: 0.1em;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.2rem;
+}
+
+.hero-card-footer {
+  margin-top: 0.75rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--text-faint);
+}
+.hero-card.selected .hero-card-footer { color: var(--gold); }
+.hero-card.taken .hero-card-footer    { color: #ff7070; }
+
+/* ── Roster ── */
+.roster-panel {
+  width: 100%;
+  max-width: 600px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--border);
+  padding: 1.25rem 1.5rem;
+}
+
+.roster-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--gold-dim);
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.roster-list {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 600px) { .roster-list { grid-template-columns: repeat(2, 1fr); } }
+
+.roster-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.75rem 0.5rem;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.3);
+  text-align: center;
+  transition: all 0.2s;
+}
+.roster-slot.filled {
+  border-color: var(--gold-dim);
+  background: rgba(201,168,76,0.05);
+}
+
+.roster-slot-avatar { font-size: 1.5rem; }
+.roster-slot-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+.roster-slot.filled .roster-slot-name { color: var(--text); }
+.roster-slot-class {
+  font-family: 'Cinzel', serif;
+  font-size: 0.55rem;
+  color: var(--text-faint);
+}
+
+/* ── Ready zone ── */
+.ready-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.waiting-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: 'Cinzel', serif;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+}
+
+.waiting-spinner {
+  font-size: 1.4rem;
+  animation: spin 3s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
