@@ -46,7 +46,7 @@
     }
     .pm-unread.visible { display: block; }
 
-    .pm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .pm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
     .pm-channel { display: none; flex-direction: column; flex: 1; min-height: 0; }
     .pm-channel.active { display: flex; }
 
@@ -194,7 +194,7 @@
       <!-- Tab content area -->
       <div class="pm-body" id="pm-body">
         <!-- DM channel (default) -->
-        <div class="pm-channel" id="pm-channel-dm">
+        <div class="pm-channel active" id="pm-channel-dm">
           <div class="pm-log" id="private-log">
             <div class="private-empty">
               NO PRIVATE TRANSMISSIONS<br><br>
@@ -762,6 +762,14 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
     function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
 
 
+
+    // Init PM display states
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('pm-body').querySelectorAll('.pm-channel').forEach(c => {
+        c.style.display = c.classList.contains('active') ? 'flex' : 'none';
+      });
+    });
+
     // ── PM Tab System ──────────────────────────────────────
     let activePmTab = "dm";
     let pmUnreadCounts = {};
@@ -771,14 +779,16 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
     window.switchPmTab = function(tabId) {
       activePmTab = tabId;
       document.querySelectorAll(".pm-tab").forEach(t => t.classList.remove("active"));
-      document.querySelectorAll(".pm-channel").forEach(c => c.classList.remove("active"));
-      const tab = document.getElementById(`pm-tab-${tabId}`);
-      const channel = document.getElementById(`pm-channel-${tabId}`);
+      document.getElementById("pm-body").querySelectorAll(".pm-channel").forEach(c => {
+        c.classList.remove("active");
+        c.style.display = "none";
+      });
+      const tab = document.getElementById("pm-tab-" + tabId);
       if (tab) tab.classList.add("active");
-      if (channel) channel.classList.add("active");
-      // Clear unread
+      const channel = document.getElementById("pm-channel-" + tabId);
+      if (channel) { channel.classList.add("active"); channel.style.display = "flex"; }
       pmUnreadCounts[tabId] = 0;
-      const dot = document.getElementById(`pm-unread-${tabId}`);
+      const dot = document.getElementById("pm-unread-" + tabId);
       if (dot) dot.classList.remove("visible");
     };
 
@@ -804,6 +814,7 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
         // Channel div
         const channel = document.createElement("div");
         channel.className = "pm-channel";
+        channel.style.display = "none";
         channel.id = `pm-channel-${p.id}`;
         channel.innerHTML = `
           <div class="pm-log" id="pm-log-${p.id}">
