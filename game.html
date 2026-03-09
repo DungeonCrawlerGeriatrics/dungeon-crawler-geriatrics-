@@ -434,6 +434,48 @@
       line-height: 1.5;
     }
 </style>
+<style>
+    /* ── Context Menu ── */
+    .ctx-menu {
+      position: fixed;
+      z-index: 2000;
+      background: var(--sys-panel);
+      border: 1px solid var(--sys-border2);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      min-width: 180px;
+      display: none;
+      animation: ctx-in 0.1s ease;
+    }
+    @keyframes ctx-in {
+      from { opacity:0; transform: scale(0.96); }
+      to   { opacity:1; transform: scale(1); }
+    }
+    .ctx-menu.open { display: block; }
+    .ctx-item {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      padding: 0.6rem 0.9rem;
+      color: var(--sys-text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.1s;
+      border-bottom: 1px solid var(--sys-border);
+    }
+    .ctx-item:last-child { border-bottom: none; }
+    .ctx-item:hover { background: rgba(255,255,255,0.04); color: var(--sys-text); }
+    .ctx-item .ctx-icon { font-size: 0.8rem; }
+    .ctx-divider { height: 1px; background: var(--sys-border); margin: 0.2rem 0; }
+    .ctx-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.52rem;
+      letter-spacing: 0.15em;
+      color: var(--sys-text-faint);
+      padding: 0.4rem 0.9rem 0.2rem;
+    }
+</style>
 </head>
 <body class="game-page">
 
@@ -1677,6 +1719,72 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       }
     }
 
+
+    // ── Right-click context menu ──────────────────────────────
+    let ctxSelectedText = '';
+
+    document.addEventListener('contextmenu', function(e) {
+      const sel = window.getSelection()?.toString().trim();
+      // Only show in group log or dm text areas
+      const inLog = e.target.closest('#group-log, .log-area, .log-entry-body, .log-body');
+      if (!inLog || !sel) return;
+
+      e.preventDefault();
+      ctxSelectedText = sel;
+
+      const menu = document.getElementById('ctx-menu');
+      const x = Math.min(e.clientX, window.innerWidth  - 200);
+      const y = Math.min(e.clientY, window.innerHeight - 140);
+      menu.style.left = x + 'px';
+      menu.style.top  = y + 'px';
+      menu.classList.add('open');
+    });
+
+    document.addEventListener('click', () => {
+      document.getElementById('ctx-menu').classList.remove('open');
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.getElementById('ctx-menu').classList.remove('open');
+    });
+
+    window.ctxAddToNotes = async function() {
+      if (!ctxSelectedText) return;
+      document.getElementById('ctx-menu').classList.remove('open');
+
+      // Switch to notes tab
+      window.switchPmTab('notes');
+      await new Promise(r => setTimeout(r, 60));
+
+      const ta = document.getElementById('notes-textarea');
+      if (!ta) return;
+      const timestamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const append = (ta.value ? '\n\n' : '') + `[${timestamp}] ${ctxSelectedText}`;
+      ta.value += append;
+      ta.dispatchEvent(new Event('input')); // trigger autosave
+      ta.scrollTop = ta.scrollHeight;
+
+      // Flash confirmation
+      showToast('Added to notes', false);
+    };
+
+    window.ctxAddToBag = async function() {
+      if (!ctxSelectedText) return;
+      document.getElementById('ctx-menu').classList.remove('open');
+      // Trim to reasonable item name length
+      const itemName = ctxSelectedText.slice(0, 60);
+      const key = Date.now().toString(36);
+      await set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), {
+        name: itemName, icon: '📝', ts: Date.now(), manual: true
+      });
+      showToast('Added to inventory', false);
+    };
+
+    window.ctxCopy = function() {
+      navigator.clipboard?.writeText(ctxSelectedText);
+      document.getElementById('ctx-menu').classList.remove('open');
+      showToast('Copied', false);
+    };
+
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
         update(ref(db,`rooms/${roomCode}/players/${me.id}`),{online:false});
@@ -1747,6 +1855,21 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       <div class="dice-result" id="dice-result">
         <div class="dice-result-label">CLICK A DIE TO ROLL</div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- Right-click context menu -->
+  <div class="ctx-menu" id="ctx-menu">
+    <div class="ctx-label">SELECTED TEXT</div>
+    <div class="ctx-item" onclick="ctxAddToNotes()">
+      <span class="ctx-icon">📋</span> Add to Notes
+    </div>
+    <div class="ctx-item" onclick="ctxAddToBag()">
+      <span class="ctx-icon">🎒</span> Add to Inventory
+    </div>
+    <div class="ctx-item" onclick="ctxCopy()">
+      <span class="ctx-icon">⎘</span> Copy
     </div>
   </div>
 
