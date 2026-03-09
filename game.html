@@ -417,7 +417,7 @@
       await postSystemNotifs(dmText);
       await writeGroupLog({type:"dm",text:dmText});
 
-      isDMThinking=false; setTyping(false);
+      isDMThinking=false; setTyping(false); renderTurnBar();
     }
 
     // ── Group action ─────────────────────────────────────────
