@@ -900,6 +900,7 @@
       // Post any [SYSTEM:] notifications as separate entries first
       await postSystemNotifs(dmText);
       parseLootFromDM(dmText);
+      await parseTransfers(dmText);
       await writeGroupLog({type:"dm",text:dmText});
 
       isDMThinking=false; setTyping(false); renderTurnBar();
@@ -923,7 +924,7 @@
       if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
 
       const actor  = players[turnIndex];
-      const pStatus = players.map(p=>`${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""} Class:${p.heroClass||"???"}`).join(" | ");
+      const pStatus = players.map(p=>{ const inv=Object.values(p.inventory||{}).map(i=>i.name).join(",") || "nothing"; return `${p.name}:HP${p.hp??p.maxHp}/${p.maxHp}${(p.hp??1)<=0?" [FALLEN]":""} Class:${p.heroClass||"???"} Inv:[${inv}]`; }).join(" | ");
       const msg = `[TURN ${turnCount+1} | ROUND ${roundCount} | DEPTH ${depth}]\n${actor?.name} acts: "${text}"\nParty: ${pStatus}\n\nNarrate result. Use [SYSTEM: text] for system notifications, {LOOT: item description} for items found. Track class-revealing behavior — if this action strongly suggests a class archetype, NOW is when you might dramatically reveal it with [SYSTEM: CLASS ASSIGNMENT — name is now a ClassName!]. Use [brackets] for all mechanics.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
@@ -934,6 +935,7 @@
       await parseMechanics(dmText);
       await postSystemNotifs(dmText);
       parseLootFromDM(dmText);
+      await parseTransfers(dmText);
       await writeGroupLog({type:"dm",text:dmText});
       await advanceTurn();
 
@@ -1012,21 +1014,29 @@
         if(p){const hp=Math.min(p.maxHp,(p.hp??p.maxHp)+parseInt(m[2]));updates[`players/${p.id}/hp`]=hp;}
       }
       // Class assignment
-      const classRe=/CLASS ASSIGNMENT[^!]*?(\w+) is now (?:a |an )?(\w+)/i;
-      const classMatch=text.match(classRe);
-      if(classMatch){
-        const playerName=classMatch[1]; const className=classMatch[2].toLowerCase();
-        const validClasses=["warrior","rogue","mage","paladin","bard","ranger","summoner","berserker"];
-        const matchedClass=validClasses.find(c=>className.includes(c));
-        if(matchedClass){
-          const p=findPlayer(playerName);
-          if(p){
-            updates[`players/${p.id}/heroClass`]=matchedClass;
-            updates[`players/${p.id}/heroEmoji`]=classEmoji(matchedClass);
-            // Post dramatic class reveal to group log
-            setTimeout(async()=>{
-              await writeGroupLog({type:"sys",sclass:"class-reveal",text:`⚡ SYSTEM: CLASS ASSIGNMENT — ${p.name} has been designated: ${matchedClass.toUpperCase()} ⚡`});
-            },500);
+      const validClasses=["warrior","rogue","mage","paladin","bard","ranger","summoner","berserker","scholar","monk","druid","necromancer","tinkerer","cleric"];
+
+      // Pattern 1: [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
+      const classRe=/CLASS ASSIGNMENT[^!\n]*?(\w[\w\s]+?) is now (?:a |an )?(\w+)/i;
+      // Pattern 2: "Name is a/the ClassName" anywhere in text
+      const classRe2=new RegExp(`(${players.map(p=>p.name.split(" ")[0]).join("|")}) (?:is now |is |has become |has been revealed as |—\s*)(?:a |an |the )?(${validClasses.join("|")})`, "i");
+
+      for (const re of [classRe, classRe2]) {
+        const classMatch = text.match(re);
+        if (classMatch) {
+          const playerName = classMatch[1].trim();
+          const className  = classMatch[2].toLowerCase();
+          const matchedClass = validClasses.find(c => className.includes(c));
+          if (matchedClass) {
+            const p = findPlayer(playerName);
+            if (p && !p.heroClass) {
+              updates[`players/${p.id}/heroClass`] = matchedClass;
+              updates[`players/${p.id}/heroEmoji`] = classEmoji(matchedClass);
+              setTimeout(async () => {
+                await writeGroupLog({type:"sys",sclass:"class-reveal",text:`⚡ SYSTEM: CLASS ASSIGNMENT — ${p.name} has been designated: ${matchedClass.toUpperCase()} ⚡`});
+              }, 500);
+              break;
+            }
           }
         }
       }
@@ -1058,7 +1068,7 @@
     }
 
     function classEmoji(cls) {
-      return {warrior:"⚔️",rogue:"🗡️",mage:"🔮",paladin:"🛡️",bard:"🎸",ranger:"🏹",summoner:"✨",berserker:"💢"}[cls]||"?";
+      return {warrior:"⚔️",rogue:"🗡️",mage:"🔮",paladin:"🛡️",bard:"🎸",ranger:"🏹",summoner:"✨",berserker:"💢",scholar:"📚",monk:"👊",druid:"🌿",necromancer:"💀",tinkerer:"⚙️",cleric:"✝️"}[cls]||"?";
     }
 
     function statLine(p) {
@@ -1095,7 +1105,11 @@
 
     // ── System prompts ───────────────────────────────────────
     function buildSysPrompt() {
-      const partyDesc = players.map(p=>`- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)}`).join("\n");
+      const partyDesc = players.map(p=>{
+        const inv = Object.values(p.inventory||{}).map(i=>i.name).join(", ") || "nothing";
+        const notes = p.id === me.id ? "" : (p.notes ? ` | Notes (private): "${p.notes}"` : "");
+        return `- ${p.name}: HP ${p.hp??p.maxHp}/${p.maxHp} | Class: ${p.heroClass||"UNASSIGNED"} | ${statLine(p)} | Inventory: ${inv}${notes}`;
+      }).join("\n");
       return `You are the Dungeon Master for "Dungeon Crawler Geriatrics" — a LitRPG dungeon crawler in the style of Dungeon Crawler Carl.
 
 LORE: A mysterious System activated mid-evening without warning, pulling a group of friends from their living room into a dungeon. Nobody consented. The System is watching everything and assigns classes based on behavior — players don't choose their class, they EARN it through actions.
@@ -1131,6 +1145,7 @@ MECHANICS:
 - [Name heals X HP! HP: XX/XX]  
 - [SYSTEM: New skill acquired — Skill Name]
 - [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
+- {TRANSFER: item name — from:PlayerName to:PlayerName} — use this when an item changes hands between players. This updates their inventories automatically.
 - Keep responses 150-250 words.
 - End EVERY response mid-scene. The world is in motion. Something is happening. Stop there.
 - NEVER end with a question. NEVER end with "What do you do?". NEVER summarize options.
@@ -1632,6 +1647,34 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
       text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
       text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
       return text;
+    }
+
+
+    // Parse {TRANSFER: item — from:Name to:Name} tags
+    async function parseTransfers(text) {
+      const re = /\{TRANSFER:\s*([^—–-]+)[—–-]\s*from:([^t]+)\s+to:([^}]+)\}/gi;
+      let match;
+      while ((match = re.exec(text)) !== null) {
+        const itemName  = match[1].trim();
+        const fromName  = match[2].trim();
+        const toName    = match[3].trim();
+        const fromPlayer = players.find(p => p.name.toLowerCase().includes(fromName.toLowerCase()));
+        const toPlayer   = players.find(p => p.name.toLowerCase().includes(toName.toLowerCase()));
+
+        // Remove from sender's inventory
+        if (fromPlayer) {
+          const inv = fromPlayer.inventory || {};
+          const itemKey = Object.keys(inv).find(k => inv[k].name?.toLowerCase().includes(itemName.toLowerCase()));
+          if (itemKey) await set(ref(db, `rooms/${roomCode}/players/${fromPlayer.id}/inventory/${itemKey}`), null);
+        }
+        // Add to receiver's inventory
+        if (toPlayer) {
+          const key = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
+          await set(ref(db, `rooms/${roomCode}/players/${toPlayer.id}/inventory/${key}`), {
+            name: itemName, icon: "◆", ts: Date.now(), fromTransfer: true
+          });
+        }
+      }
     }
 
     window.leaveGame = function(){
