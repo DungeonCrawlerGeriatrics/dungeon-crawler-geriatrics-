@@ -1158,12 +1158,12 @@ OPENING SCENE RULES:
 ${encodedState}
 
 #LEDGER
-${ledger || '\u2205 (game just started)'}${privBlock}
+${ledger || '∅ (game just started)'}${privBlock}
 
 #ACTION
 ${actor?.name} (${actor?.heroClass||"UNASSIGNED"}) acts: "${text}"
 
-Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name \u2014 desc} for items. {TRANSFER: name \u2014 from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT \u2014 Name is now ClassName!] only when assigning.\`;
+Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name — desc} for items. {TRANSFER: name — from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] only when assigning.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
