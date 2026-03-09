@@ -305,6 +305,12 @@
           <span class="pm-unread" id="pm-unread-dm"></span>
         </button>
         <!-- Player tabs injected here by JS -->
+        <button class="pm-tab" id="pm-tab-notes" onclick="switchPmTab('notes')">
+          📋 NOTES
+        </button>
+        <button class="pm-tab" id="pm-tab-bag" onclick="switchPmTab('bag')">
+          🎒 BAG
+        </button>
       </div>
 
       <!-- Tab content area -->
@@ -329,6 +335,40 @@
           </div>
         </div>
         <!-- Player channels injected by JS -->
+
+        <!-- NOTES channel -->
+        <div class="pm-channel" id="pm-channel-notes" style="display:none">
+          <div class="pm-input-zone" style="flex:1;display:flex;flex-direction:column;border-top:none;background:rgba(0,212,255,0.02);">
+            <div class="pm-input-label" style="color:var(--sys-glow-dim);">// PRIVATE NOTES — DM CAN SEE THESE</div>
+            <textarea id="notes-textarea"
+              style="flex:1;min-height:200px;background:transparent;border:1px solid var(--sys-border);color:var(--sys-text);font-family:'Share Tech Mono',monospace;font-size:.72rem;padding:.6rem;resize:none;outline:none;line-height:1.6;"
+              placeholder="Write anything... theories, clues, who you suspect, what you found.&#10;&#10;The DM reads these. Plan accordingly."></textarea>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--sys-text-faint);letter-spacing:.1em;margin-top:.4rem;text-align:right;" id="notes-save-status">AUTOSAVES AS YOU TYPE</div>
+          </div>
+        </div>
+
+        <!-- BAG channel -->
+        <div class="pm-channel" id="pm-channel-bag" style="display:none">
+          <div class="pm-log" id="bag-list" style="flex:1;padding:.6rem;overflow-y:auto;max-height:calc(100vh - 280px);">
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--sys-text-faint);letter-spacing:.1em;text-align:center;padding:1rem;">
+              INVENTORY EMPTY<br><br>Find loot. Don't die.<br>
+              <span style="font-size:.52rem;opacity:.6">Items from DM appear automatically</span>
+            </div>
+          </div>
+          <div class="pm-input-zone" style="background:rgba(255,204,68,0.03);">
+            <div class="pm-input-label" style="color:var(--sys-gold-dim);">// ADD ITEM MANUALLY</div>
+            <div style="display:flex;gap:.4rem;">
+              <input type="text" id="bag-input"
+                style="flex:1;background:transparent;border:1px solid var(--sys-border);color:var(--sys-text);font-family:'Share Tech Mono',monospace;font-size:.7rem;padding:.4rem .6rem;outline:none;"
+                placeholder="Item name..."
+                onkeydown="if(event.key==='Enter')addBagItem()">
+              <button onclick="addBagItem()"
+                style="font-family:'Share Tech Mono',monospace;font-size:.65rem;padding:.4rem .7rem;border:1px solid var(--sys-gold-dim);background:transparent;color:var(--sys-gold);cursor:pointer;letter-spacing:.1em;">
+                + ADD
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="depth-section">
@@ -424,6 +464,8 @@
       renderPips();
       renderPlayerTabs();
       syncPlayerPms();
+      syncBag();
+      if (document.getElementById('pm-channel-notes').style.display !== 'none') initNotes();
       syncGroupLog(roomData.log||{});
 
       // Load private history from my player data
@@ -629,6 +671,7 @@
 
       // Post any [SYSTEM:] notifications as separate entries first
       await postSystemNotifs(dmText);
+      parseLootFromDM(dmText);
       await writeGroupLog({type:"dm",text:dmText});
 
       isDMThinking=false; setTyping(false); renderTurnBar();
@@ -662,6 +705,7 @@
       // Parse mechanics
       await parseMechanics(dmText);
       await postSystemNotifs(dmText);
+      parseLootFromDM(dmText);
       await writeGroupLog({type:"dm",text:dmText});
       await advanceTurn();
 
@@ -929,6 +973,7 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
 
     window.switchPmTab = function(tabId) {
       activePmTab = tabId;
+      if (tabId === 'notes') setTimeout(initNotes, 50);
       document.querySelectorAll(".pm-tab").forEach(t => t.classList.remove("active"));
       document.getElementById("pm-body").querySelectorAll(".pm-channel").forEach(c => {
         c.classList.remove("active");
@@ -1110,6 +1155,94 @@ Keep under 120 words. Be conspiratorial. Make them feel special. Secrets have co
     document.addEventListener("keydown", e => {
       if (e.key === "Escape") document.getElementById("stat-modal-overlay").classList.remove("open");
     });
+
+
+    // ── Notes ────────────────────────────────────────────────
+    let notesSaveTimer = null;
+    let notesLoaded = false;
+
+    function initNotes() {
+      if (notesLoaded) return;
+      notesLoaded = true;
+      // Load existing notes
+      const saved = roomData?.players?.[me.id]?.notes || "";
+      const ta = document.getElementById("notes-textarea");
+      if (ta && !ta.value) ta.value = saved;
+      if (ta) ta.addEventListener("input", () => {
+        document.getElementById("notes-save-status").textContent = "SAVING...";
+        clearTimeout(notesSaveTimer);
+        notesSaveTimer = setTimeout(async () => {
+          await update(ref(db, `rooms/${roomCode}/players/${me.id}`), { notes: ta.value });
+          document.getElementById("notes-save-status").textContent = "✓ SAVED";
+          setTimeout(() => {
+            document.getElementById("notes-save-status").textContent = "AUTOSAVES AS YOU TYPE";
+          }, 2000);
+        }, 800);
+      });
+    }
+
+    // ── Bag / Inventory ──────────────────────────────────────
+    let renderedBagKeys = new Set();
+
+    function syncBag() {
+      const items = roomData?.players?.[me.id]?.inventory || {};
+      const bagList = document.getElementById("bag-list");
+      if (!bagList) return;
+
+      const entries = Object.entries(items).sort(([,a],[,b]) => (a.ts||0)-(b.ts||0));
+      if (entries.length === 0) return;
+
+      // Clear empty placeholder
+      const empty = bagList.querySelector("div[style*='INVENTORY EMPTY']") || bagList.querySelector("div:first-child");
+      if (renderedBagKeys.size === 0 && empty) empty.style.display = "none";
+
+      entries.forEach(([key, item]) => {
+        if (renderedBagKeys.has(key)) return;
+        renderedBagKeys.add(key);
+        const div = document.createElement("div");
+        div.id = "bagitem-" + key;
+        div.style.cssText = "display:flex;align-items:center;gap:.5rem;padding:.45rem .5rem;border-bottom:1px solid var(--sys-border);";
+        div.innerHTML = `
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--sys-gold);flex:1;">${item.icon||"◆"} ${item.name}</span>
+          ${item.desc ? `<span style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--sys-text-dim);font-style:italic;">${item.desc}</span>` : ""}
+          <button onclick="removeBagItem('${key}')"
+            style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--sys-red);background:none;border:none;cursor:pointer;padding:0 .2rem;opacity:.5;"
+            title="Remove">✕</button>`;
+        bagList.appendChild(div);
+      });
+    }
+
+    window.addBagItem = async function() {
+      const input = document.getElementById("bag-input");
+      const name = input?.value.trim();
+      if (!name) return;
+      input.value = "";
+      const key = Date.now().toString(36);
+      await set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), {
+        name, icon: "◆", ts: Date.now(), manual: true
+      });
+    };
+
+    window.removeBagItem = async function(key) {
+      await set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), null);
+      const el = document.getElementById("bagitem-" + key);
+      if (el) el.remove();
+      renderedBagKeys.delete(key);
+    };
+
+    // Auto-add loot from DM {LOOT: name — desc} tags
+    function parseLootFromDM(text) {
+      const regex = /\{LOOT:\s*([^—–-]+)[—–-]?([^}]*)\}/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const name = match[1].trim();
+        const desc = match[2].trim();
+        const key  = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
+        set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), {
+          name, desc, icon: "✦", ts: Date.now(), fromDM: true
+        });
+      }
+    }
 
     window.leaveGame = function(){
       if(confirm("RAGEQUIT? Your character will be marked as having 'tripped into a pit'.")){
