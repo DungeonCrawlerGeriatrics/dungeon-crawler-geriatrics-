@@ -913,11 +913,18 @@
 
     function formatDM(text) {
       return text
+        // Strip TRANSFER tags entirely from display — they're mechanical only
+        .replace(/\{TRANSFER:[^}]+\}/g, '')
+        // Strip LOOT tags but show a pretty inventory pill
+        .replace(/\{LOOT:\s*([^—–}-]+)[—–-]?([^}]*)\}/g, (_, name, desc) => {
+          const n = name.trim();
+          const d = desc.trim();
+          return `<span class="loot" title="${d}">✦ ${n}</span>`;
+        })
         .replace(/\[ROLL:\s*([^\]]+)\]/g, (_, inner) =>
           `<span class="roll-call" onclick="document.querySelector('.dice-fab').click()" title="Open dice tray">🎲 ROLL REQUIRED: ${inner.trim()}</span>`)
         .replace(/\[SYSTEM:[^\]]+\]/g, m => `<span class="mech">${m}</span>`)
         .replace(/\[([^\]]+)\]/g, m => `<span class="mech">${m}</span>`)
-        .replace(/\{LOOT:[^}]+\}/g, m => `<span class="loot">${m.replace(/\{LOOT:/,"").replace(/\}/,"")}</span>`)
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/\*([^*]+)\*/g, '<em>$1</em>')
         .replace(/\n/g,"<br>");
@@ -971,7 +978,54 @@
       isDMThinking=true; setTyping(true); renderTurnBar();
 
       const party = players.map(p=>`- ${p.name} (${statLine(p)})`).join("\n");
-      const openMsg = `DUNGEON INSTANCE INITIALIZED.\n\nThe friends:\n${party}\n\nThey were just hanging out — maybe a game night, watching something, having drinks. Then the System activated without warning. Their living room is now the entry chamber of a dungeon. Some of their stuff came with them.\n\nBegin. Describe the sudden transition — the terror and confusion of the System activation. Introduce the in-world System UI notification floating in their vision. Make it funny AND genuinely alarming. Drop them into the moment mid-breath. Do NOT offer choices. Do NOT ask what they do. Just stop. Let the silence do the work.`;
+      const backstories = players.map(p => p.backstory ? `${p.name}'s backstory: ${p.backstory.slice(0,220)}...` : '').filter(Boolean).join("\n");
+
+      // Randomized seeds so every opening is genuinely different
+      const SEEDS = [
+        "They were mid-argument about something completely stupid when it happened.",
+        "Someone had just made a truly awful dad joke. Nobody was laughing yet.",
+        "The pizza had just arrived. It is now on the dungeon floor.",
+        "One of them had been half-asleep for twenty minutes. They are still confused.",
+        "Someone had literally just said 'I should probably head home soon.'",
+        "An argument about a board game rule had reached dangerous intensity.",
+        "The snacks were mid-handoff — suspended in someone's outstretched hand.",
+        "Someone was on hold with customer service. The hold music came with them.",
+        "They were watching something embarrassing and genuinely loving it.",
+        "Someone had just gotten up to use the bathroom. They didn't make it back."
+      ];
+      const ENTRIES = [
+        "The floor drops exactly four inches without warning. Everyone's stomach lurches. It just... stays there. Lower. Wrong.",
+        "The walls don't vanish — they convert. Drywall becomes granite mid-breath. Takes about two seconds. That's the worst part.",
+        "It folds. Reality creases like bad cardboard and unfolds somewhere else entirely.",
+        "There's a sound like a massive file transferring. Then: dungeon. No transition. Just dungeon.",
+        "The smell arrives first — centuries of wet stone. Vision catches up a half-second later, which is worse.",
+        "The lights change color rather than going out. Warm bulb-yellow to cold torchlight. The half-second of both colors at once will haunt them.",
+        "Someone's phone buzzes. The notification reads: INSTANCE ALLOCATED. Then the room disagrees with itself.",
+        "The TV doesn't shut off — it keeps playing, but the screen is now a torch bracket on a stone wall, still glowing.",
+        "Everything gets heavier. The air, the furniture, the specific sense of dread. Then the walls catch up.",
+        "The carpet becomes something. Not stone exactly — more like the memory of stone. Cold, purposeful, opinionated."
+      ];
+      const seed  = SEEDS[Math.floor(Math.random()  * SEEDS.length)];
+      const entry = ENTRIES[Math.floor(Math.random() * ENTRIES.length)];
+
+      const openMsg = `DUNGEON INSTANCE INITIALIZED.
+
+Party:
+${party}
+
+${backstories ? `CHARACTER BACKSTORIES — read these. Use them. Reference specific details directly in the opening:\n${backstories}\n` : ''}
+Pre-dungeon moment: ${seed}
+Transition type: ${entry}
+
+OPENING SCENE RULES — follow these exactly:
+- Reference at least ONE specific detail from someone's actual backstory in the opening — make them feel seen and roasted
+- The physical transition must feel specific and wrong in the way described above — do NOT default to fog, silence, or mildew smell
+- Give each person ONE absurd mundane object that came with them — make it specific to who they are
+- The [SYSTEM: WELCOME] notification should be snarky and slightly different from a standard corporate message
+- Do NOT describe their emotional state — just the world going wrong around them
+- End mid-moment before anyone has processed what's happening
+- Do NOT offer choices. Do NOT ask what they do. Paint the scene and stop.`;
+
 
       const dmText = await callClaude(buildSysPrompt(), openMsg, []);
       aiHistory = [{role:"user",content:openMsg},{role:"assistant",content:dmText}];
@@ -1643,12 +1697,18 @@ Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
 
     // Auto-add loot from DM {LOOT: name — desc} tags
     function parseLootFromDM(text) {
-      const regex = /\{LOOT:\s*([^—–-]+)[—–-]?([^}]*)\}/g;
+      const regex = /\{LOOT:\s*([^—–}-]+)[—–-]?([^}]*)\}/g;
       let match;
+      // Dedupe: collect existing item names to avoid re-adding
+      const existingNames = new Set(
+        Object.values(myPlayer?.inventory||{}).map(i => i.name?.toLowerCase().trim())
+      );
       while ((match = regex.exec(text)) !== null) {
         const name = match[1].trim();
         const desc = match[2].trim();
-        const key  = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
+        if (existingNames.has(name.toLowerCase())) continue; // skip duplicate
+        existingNames.add(name.toLowerCase());
+        const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`;
         set(ref(db, `rooms/${roomCode}/players/${me.id}/inventory/${key}`), {
           name, desc, icon: "✦", ts: Date.now(), fromDM: true
         });
@@ -1787,28 +1847,35 @@ Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
     }
 
 
-    // Parse {TRANSFER: item — from:Name to:Name} tags
+    // Parse {TRANSFER: item — from:Name to:Name} tags — handles CHAMBER as a virtual source
     async function parseTransfers(text) {
-      const re = /\{TRANSFER:\s*([^—–-]+)[—–-]\s*from:([^t]+)\s+to:([^}]+)\}/gi;
+      const re = /\{TRANSFER:\s*([^—–}-]+)[—–-]\s*from:([^\s][^t][^o][^:]*?)\s+to:([^}]+)\}/gi;
       let match;
       while ((match = re.exec(text)) !== null) {
-        const itemName  = match[1].trim();
-        const fromName  = match[2].trim();
-        const toName    = match[3].trim();
-        const fromPlayer = players.find(p => p.name.toLowerCase().includes(fromName.toLowerCase()));
+        const itemName = match[1].trim();
+        const fromName = match[2].trim();
+        const toName   = match[3].trim();
+
+        // fromName can be "CHAMBER", "ROOM", "DUNGEON" etc — virtual sources, skip inventory removal
+        const isVirtualSource = /chamber|room|dungeon|floor|chest|source/i.test(fromName);
+        const fromPlayer = isVirtualSource ? null : players.find(p => p.name.toLowerCase().includes(fromName.toLowerCase()));
         const toPlayer   = players.find(p => p.name.toLowerCase().includes(toName.toLowerCase()));
 
-        // Remove from sender's inventory
+        // Remove from real sender's inventory
         if (fromPlayer) {
           const inv = fromPlayer.inventory || {};
           const itemKey = Object.keys(inv).find(k => inv[k].name?.toLowerCase().includes(itemName.toLowerCase()));
           if (itemKey) await set(ref(db, `rooms/${roomCode}/players/${fromPlayer.id}/inventory/${itemKey}`), null);
         }
-        // Add to receiver's inventory
+
+        // Add to receiver — look up desc from existing inventory if available
         if (toPlayer) {
-          const key = Date.now().toString(36) + Math.random().toString(36).slice(2,4);
+          const existingInv = Object.values(toPlayer.inventory||{});
+          const alreadyHas  = existingInv.some(i => i.name?.toLowerCase().trim() === itemName.toLowerCase().trim());
+          if (alreadyHas) continue;
+          const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`;
           await set(ref(db, `rooms/${roomCode}/players/${toPlayer.id}/inventory/${key}`), {
-            name: itemName, icon: "◆", ts: Date.now(), fromTransfer: true
+            name: itemName, desc: "", icon: "◆", ts: Date.now(), fromTransfer: true
           });
         }
       }
