@@ -1465,7 +1465,7 @@ CRITICAL RULE — INVENTORY INTEGRITY:
 The INVENTORY lists above are the single source of truth. ONLY reference items that appear there.
 NEVER invent items a player is carrying — no phantom journals, no imaginary coins, no made-up weapons.
 If you want a player to HAVE something, give it to them explicitly with {LOOT: item — desc} so it saves.
-If an item moves between players, use {TRANSFER: item — from:Name to:Name}.
+If an item moves between players: {TRANSFER: EXACT_ITEM_NAME — from:SenderFirstName to:ReceiverFirstName}. Use the item's EXACT name from the inventory list. One tag per item.
 Referencing items that don't exist in the inventory list breaks immersion and player trust.
 
 CLASS TRACKING (secret — don't tell players):
@@ -1478,7 +1478,7 @@ MECHANICS:
 - [Name heals X HP! HP: XX/XX]  
 - [SYSTEM: New skill acquired — Skill Name]
 - [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
-- {TRANSFER: item name — from:PlayerName to:PlayerName} — use this when an item changes hands between players. This updates their inventories automatically.
+- {TRANSFER: EXACT item name from inventory — from:SenderName to:ReceiverName} — one tag per item, exact name match required, removes from sender and adds to receiver automatically.
 - Keep responses 150-250 words.
 - End EVERY response mid-scene. The world is in motion. Something is happening. Stop there.
 - NEVER end with a question. NEVER end with "What do you do?". NEVER summarize options.
@@ -1542,7 +1542,7 @@ This is a PRIVATE channel. Only this player sees your response. You can:
 
 GIVING NEW ITEMS: Tag every new item with {LOOT: item name — description} so inventory updates automatically. Do NOT describe items in prose without tagging them — they won't be saved.
 
-TAKING/MOVING ITEMS: Use {TRANSFER: item name — from:PlayerName to:PlayerName} to move items between players.
+TAKING/MOVING ITEMS: Use one {TRANSFER:} tag per item. Format: {TRANSFER: EXACT item name — from:SenderFirstName to:ReceiverFirstName}. The item name must exactly match what's in the sender's inventory list. This removes it from their bag and adds it to the receiver's.
 
 If your response causes something visible to the group, include [public: what others would see — third person]. Strip it from the private response.
 
@@ -2028,34 +2028,64 @@ Keep under 150 words. Be conspiratorial. Secrets have consequences.`;
 
     // Parse {TRANSFER: item — from:Name to:Name} tags — handles CHAMBER as a virtual source
     async function parseTransfers(text) {
-      const re = /\{TRANSFER:\s*([^—–}-]+)[—–-]\s*from:([^\s][^t][^o][^:]*?)\s+to:([^}]+)\}/gi;
+      // Simple, correct regex: capture item name, then from:X, then to:Y
+      const re = /\{TRANSFER:\s*([^—–\-}]+?)\s*[—–\-]+\s*from:\s*([^}]+?)\s+to:\s*([^}]+?)\s*\}/gi;
       let match;
       while ((match = re.exec(text)) !== null) {
         const itemName = match[1].trim();
         const fromName = match[2].trim();
         const toName   = match[3].trim();
 
-        // fromName can be "CHAMBER", "ROOM", "DUNGEON" etc — virtual sources, skip inventory removal
-        const isVirtualSource = /chamber|room|dungeon|floor|chest|source/i.test(fromName);
-        const fromPlayer = isVirtualSource ? null : players.find(p => p.name.toLowerCase().includes(fromName.toLowerCase()));
-        const toPlayer   = players.find(p => p.name.toLowerCase().includes(toName.toLowerCase()));
+        console.log(`TRANSFER parsed: "${itemName}" from:"${fromName}" to:"${toName}"`);
 
-        // Remove from real sender's inventory
+        // fromName can be "CHAMBER", "ROOM", "DUNGEON" etc — virtual sources, skip removal
+        const isVirtualSource = /chamber|room|dungeon|floor|chest|source|environment/i.test(fromName);
+        const fromPlayer = isVirtualSource ? null : players.find(p =>
+          fromName.toLowerCase().includes(p.name.split(' ')[0].toLowerCase()) ||
+          p.name.toLowerCase().includes(fromName.toLowerCase())
+        );
+        const toPlayer = players.find(p =>
+          toName.toLowerCase().includes(p.name.split(' ')[0].toLowerCase()) ||
+          p.name.toLowerCase().includes(toName.toLowerCase())
+        );
+
+        console.log(`  fromPlayer: ${fromPlayer?.name||'(virtual/none)'}, toPlayer: ${toPlayer?.name||'(not found)'}`);
+
+        // Remove from sender — match by partial item name
         if (fromPlayer) {
           const inv = fromPlayer.inventory || {};
-          const itemKey = Object.keys(inv).find(k => inv[k].name?.toLowerCase().includes(itemName.toLowerCase()));
-          if (itemKey) await set(ref(db, `rooms/${roomCode}/players/${fromPlayer.id}/inventory/${itemKey}`), null);
+          const itemKey = Object.keys(inv).find(k =>
+            inv[k].name?.toLowerCase().includes(itemName.toLowerCase()) ||
+            itemName.toLowerCase().includes(inv[k].name?.toLowerCase())
+          );
+          if (itemKey) {
+            console.log(`  Removing "${inv[itemKey].name}" from ${fromPlayer.name}`);
+            await set(ref(db, `rooms/${roomCode}/players/${fromPlayer.id}/inventory/${itemKey}`), null);
+          } else {
+            console.log(`  WARNING: item "${itemName}" not found in ${fromPlayer.name}'s inventory`);
+          }
         }
 
-        // Add to receiver — look up desc from existing inventory if available
+        // Add to receiver — skip if already has it
         if (toPlayer) {
           const existingInv = Object.values(toPlayer.inventory||{});
-          const alreadyHas  = existingInv.some(i => i.name?.toLowerCase().trim() === itemName.toLowerCase().trim());
-          if (alreadyHas) continue;
+          const alreadyHas  = existingInv.some(i =>
+            i.name?.toLowerCase().trim() === itemName.toLowerCase().trim()
+          );
+          if (alreadyHas) { console.log(`  ${toPlayer.name} already has "${itemName}", skipping`); continue; }
+
+          // Carry over desc from sender's inventory if available
+          const fromInv   = fromPlayer ? Object.values(fromPlayer.inventory||{}) : [];
+          const srcItem   = fromInv.find(i => i.name?.toLowerCase().includes(itemName.toLowerCase()));
           const key = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`;
           await set(ref(db, `rooms/${roomCode}/players/${toPlayer.id}/inventory/${key}`), {
-            name: itemName, desc: "", icon: "◆", ts: Date.now(), fromTransfer: true
+            name: itemName,
+            desc: srcItem?.desc || "",
+            icon: srcItem?.icon || "◆",
+            ts: Date.now(),
+            fromTransfer: true
           });
+          console.log(`  Added "${itemName}" to ${toPlayer.name}`);
         }
       }
     }
