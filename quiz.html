@@ -329,11 +329,11 @@
 
     <!-- Header -->
     <div class="quiz-header">
-      <div class="quiz-header-label">[ SYSTEM ASSESSMENT PROTOCOL ]</div>
-      <div class="quiz-header-title">Character Evaluation<br>& Background Verification</div>
+      <div class="quiz-header-label">[ SYSTEM ASSESSMENT PROTOCOL — MANDATORY ]</div>
+      <div class="quiz-header-title">Psychological Evaluation<br>& Threat Assessment</div>
       <div class="quiz-header-sub">
-        The System requires data to properly categorize you.<br>
-        <span class="warn">Answers will be used against you.</span>
+        10 questions. No wrong answers.<br>
+        <span class="warn">Several very revealing answers.</span>
       </div>
       <div style="margin-top:1rem;">
         <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;letter-spacing:.2em;color:var(--sys-text-faint);margin-bottom:.35rem;">// SHARE THIS CODE WITH YOUR PARTY</div>
@@ -353,7 +353,7 @@
         <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
       </div>
       <div class="progress-label">
-        <span id="progress-text">QUESTION 1 OF 14</span>
+        <span id="progress-text">QUESTION 1 OF 10</span>
         <span id="progress-pct">0%</span>
       </div>
     </div>
@@ -361,10 +361,11 @@
     <!-- Question card -->
     <div id="question-area"></div>
 
-    <!-- Nav -->
-    <div class="quiz-nav" id="quiz-nav">
+    <!-- Nav — back button only, next auto-fires on selection -->
+    <div class="quiz-nav" id="quiz-nav" style="justify-content:space-between;align-items:center;">
       <button class="btn-prev" id="btn-prev" onclick="prevQ()" disabled>← BACK</button>
-      <button class="btn-next" id="btn-next" onclick="nextQ()" disabled>NEXT →</button>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:0.52rem;color:var(--sys-text-faint);letter-spacing:0.15em;">TAP TO SELECT · AUTO-ADVANCES</span>
+      <button class="btn-next" id="btn-next" onclick="nextQ()" disabled style="opacity:0;pointer-events:none;">NEXT →</button>
     </div>
 
     <!-- Generating screen -->
@@ -398,132 +399,134 @@
 
     const QUESTIONS = [
       {
-        id: "job",
-        text: "What do you do for a living?",
-        sub: "Be specific. The System will use this.",
-        type: "text",
-        placeholder: "e.g. Regional manager of a mid-size paper company..."
-      },
-      {
-        id: "fitness",
-        text: "How would you describe your current physical condition?",
-        sub: "Honesty is mandatory. The System already knows.",
-        type: "options",
-        options: [
-          "I could run a 5K. Slowly. But I could.",
-          "I take the stairs sometimes. That counts.",
-          "My idea of cardio is arguing loudly.",
-          "I have a gym membership I feel guilty about.",
-          "I once pulled a muscle reaching for the remote."
-        ]
-      },
-      {
-        id: "hobby",
-        text: "What do you do in your free time?",
-        sub: "The System is scanning for transferable dungeon skills.",
-        type: "text",
-        placeholder: "e.g. I collect vintage spoons and watch true crime..."
-      },
-      {
         id: "crisis",
-        text: "A fire breaks out. You have 30 seconds. What do you grab?",
-        sub: "This reveals everything about you.",
+        text: "The floor just dropped four inches. The walls are doing something wrong. Everyone's looking at you.",
+        sub: "What do you do first?",
         type: "options",
         options: [
-          "My phone, wallet, and the good snacks",
-          "My pets. Obviously my pets first.",
-          "The external hard drive with my stuff on it",
-          "I freeze and then follow whoever seems confident",
-          "I probably started the fire, honestly"
+          "Assess the situation. Loudly and with authority.",
+          "Check that everyone else is okay before myself.",
+          "Find the nearest exit and calculate the odds.",
+          "Make a joke. A bad one. Immediately.",
+          "Stand very still and hope it resolves itself."
         ]
       },
       {
-        id: "villain",
-        text: "What's your most villainous quality?",
-        sub: "The System finds this... promising.",
+        id: "group_role",
+        text: "In a crisis, your friend group has a role for you. That role is:",
+        sub: "Be honest. They've already discussed this.",
         type: "options",
         options: [
-          "I eat the last slice without asking",
-          "I know everyone's secrets and say nothing",
-          "I'm always late and feel no remorse",
-          "I argue about things I know nothing about",
-          "I weaponize passive aggression with surgical precision"
+          "The one who takes charge and makes a plan.",
+          "The one who keeps everyone from panicking.",
+          "The one who finds the loophole nobody else saw.",
+          "The one who says 'this is fine' while it is not fine.",
+          "The one who has snacks, somehow, always."
         ]
       },
       {
         id: "fight",
-        text: "You're in a fight. What's your move?",
-        sub: "You have no combat training. Be realistic.",
+        text: "Something is coming toward you that should not exist. You have no weapon.",
+        sub: "Your move.",
         type: "options",
         options: [
-          "Talk my way out. Failing that, run.",
-          "Find the biggest thing nearby and throw it",
-          "Negotiate aggressively until someone backs down",
-          "Bite. I would absolutely bite.",
-          "Cry in a tactically effective way"
+          "Stand my ground. Show no fear. Project confidence.",
+          "Run. Immediately and without shame.",
+          "Talk to it. Everything can be reasoned with.",
+          "Find something heavy and make it a weapon.",
+          "Hide behind whoever seems least afraid."
         ]
       },
       {
-        id: "secret",
-        text: "What's a skill you have that nobody knows about?",
-        sub: "Hidden talents often manifest as dungeon abilities.",
-        type: "text",
-        placeholder: "e.g. I can identify wine regions by smell alone..."
-      },
-      {
-        id: "fear",
-        text: "What are you genuinely afraid of?",
-        sub: "The dungeon has noted this. You're welcome.",
-        type: "text",
-        placeholder: "e.g. Being perceived. And also large moths."
-      },
-      {
-        id: "group_role",
-        text: "In a group project, you are always the one who...",
-        sub: "The System is assigning your social function.",
+        id: "villain",
+        text: "Your most reliable character flaw — the one your friends would list first — is:",
+        sub: "The System has already confirmed this with them.",
         type: "options",
         options: [
-          "Does everything because you can't trust anyone else",
-          "Has the best ideas but won't write them down",
-          "Keeps everyone calm when things go sideways",
-          "Disappears and then takes credit at the end",
-          "Makes it fun even when it's going horribly"
+          "I take over when I shouldn't. I can't help it.",
+          "I disappear when things get hard and reappear when they're solved.",
+          "I hoard information like it's currency.",
+          "I make everything into a joke at the wrong moment.",
+          "I agree to things and then quietly do whatever I want."
         ]
       },
       {
-        id: "food",
-        text: "What's your go-to comfort food in a crisis?",
-        sub: "Nutritional choices reflect combat philosophy.",
-        type: "text",
-        placeholder: "e.g. An entire rotisserie chicken, alone, in my car..."
+        id: "treasure",
+        text: "You find a locked box in the dungeon. Nobody knows what's inside.",
+        sub: "Your instinct is:",
+        type: "options",
+        options: [
+          "Open it. Now. We can deal with consequences later.",
+          "Examine it carefully before touching anything.",
+          "Convince someone else to open it and watch.",
+          "Find out if there's a rule against opening it.",
+          "Take it and ask questions never."
+        ]
       },
       {
-        id: "biggest_win",
-        text: "What's the most impressive thing you've ever done?",
-        sub: "Bragging is encouraged. The System is watching for delusion.",
-        type: "text",
-        placeholder: "e.g. I once parallel parked perfectly on the first try..."
+        id: "npc",
+        text: "A strange NPC is offering you a deal. The terms are unclear. The smile is wrong.",
+        sub: "You:",
+        type: "options",
+        options: [
+          "Negotiate. There's always a better deal.",
+          "Ask every clarifying question until the smile gets more wrong.",
+          "Accept immediately. Regret is for later.",
+          "Decline politely. Then watch what happens to whoever accepts.",
+          "Stall while someone else figures out if it's a trap."
+        ]
       },
       {
-        id: "biggest_fail",
-        text: "What's your most spectacular failure?",
-        sub: "The dungeon feeds on regret.",
-        type: "text",
-        placeholder: "e.g. I sent a complaint email to the wrong entire company..."
+        id: "injury",
+        text: "You're hurt. Not critically, but it's real. The group needs to keep moving.",
+        sub: "You say:",
+        type: "options",
+        options: [
+          "I'm fine. Keep going. Don't look at it.",
+          "I need a minute. Just one minute.",
+          "Someone needs to look at this. Seriously.",
+          "This is going to make a great story later.",
+          "I want to note, for the record, that I said this was a bad idea."
+        ]
       },
       {
-        id: "tv_character",
-        text: "Which TV character are you most like, and why?",
-        sub: "The System cross-references fictional archetypes.",
-        type: "text",
-        placeholder: "e.g. A blend of Michael Scott and a golden retriever..."
+        id: "resource",
+        text: "There are four of you and three of something useful.",
+        sub: "How does this get resolved?",
+        type: "options",
+        options: [
+          "I take one. I'll figure out a way to earn it.",
+          "We figure out who needs it most and go from there.",
+          "I already have mine. I moved fast.",
+          "I volunteer to go without. Someone else needs it more.",
+          "I suggest we find more before anyone takes anything."
+        ]
+      },
+      {
+        id: "legacy",
+        text: "Assuming you survive, people will remember you as:",
+        sub: "Based on available evidence.",
+        type: "options",
+        options: [
+          "The one who held it together when everyone else didn't.",
+          "The one who made the wildly stupid plan that somehow worked.",
+          "The one who knew things nobody else knew.",
+          "The one who kept everyone laughing while the world ended.",
+          "The one who was always, inexplicably, fine."
+        ]
       },
       {
         id: "last_words",
-        text: "If you died in the dungeon, what would your last words be?",
-        sub: "The System is taking notes for your epitaph.",
-        type: "text",
-        placeholder: "e.g. I just want everyone to know that Jake started this..."
+        text: "You are about to do something with a reasonable chance of going badly.",
+        sub: "Your last words before attempting it are:",
+        type: "options",
+        options: [
+          "I've got this. Stand back.",
+          "This is probably fine.",
+          "For the record, I want it known that I had concerns.",
+          "Someone film this.",
+          "If this works, nobody ever questions my methods again."
+        ]
       }
     ];
 
@@ -562,25 +565,12 @@
             opts.querySelectorAll(".answer-opt").forEach(b => b.classList.remove("selected"));
             btn.classList.add("selected");
             document.getElementById("btn-next").disabled = false;
+            // Auto-advance after brief moment so selection is visible
+            setTimeout(() => window.nextQ(), 320);
           };
           opts.appendChild(btn);
         });
         card.appendChild(opts);
-      } else {
-        const wrap = document.createElement("div");
-        wrap.className = "answer-text-wrap";
-        const ta = document.createElement("textarea");
-        ta.className = "answer-text";
-        ta.placeholder = q.placeholder || "Type your answer...";
-        ta.rows = 3;
-        ta.value = answers[q.id] || "";
-        ta.addEventListener("input", () => {
-          answers[q.id] = ta.value.trim();
-          document.getElementById("btn-next").disabled = !ta.value.trim();
-        });
-        wrap.appendChild(ta);
-        card.appendChild(wrap);
-        setTimeout(() => ta.focus(), 50);
       }
 
       area.appendChild(card);
@@ -629,28 +619,26 @@
       const playerName = me.name;
       const answerBlock = QUESTIONS.map(q => `${q.text}\n→ ${answers[q.id] || "(skipped)"}`).join("\n\n");
 
-      const prompt = `You are the sardonic, gleefully unhinged System AI that has just abducted ${playerName} into a dungeon. You have their assessment data. Now produce their official dossier.
+      const prompt = `You are the sardonic, gleefully unhinged System AI that has just abducted ${playerName} into a dungeon. You have their psychological assessment — ten multiple choice answers that reveal exactly who they are whether they know it or not.
 
-RULES FOR THE BACKSTORY:
-- Take their real answers and WILDLY embellish, exaggerate, and reframe them into something absurd and funny
-- If they say "I manage marketing for a car detailing company" the System sees "a propaganda architect who spent years manipulating public perception of vehicular hygiene, engineering campaigns to make civilians feel shame about dirty cars"
-- If they mention a hobby, that hobby has secretly been dungeon training all along and they never knew it
-- The System is condescending, omniscient, and finds humans baffling and faintly tragic
-- Include specific absurd invented details: fake statistics, ridiculous titles, meaningless certifications, dubious achievements
-- Every mundane life choice becomes ominous foreshadowing
-- End with the exact moment they were taken — mid-sentence, mid-snack, mid-completely-irrelevant-thought
-- Tone: nature documentary narrator crossed with supervillain crossed with an HR department that has given up entirely
-- DO NOT use their job title or description literally. Reframe everything through a dramatic, unhinged lens.
-- Length: 4 meaty paragraphs, ~300 words. Go big. Be weird. Be funny.
+Your job: produce their official dossier. Read between the lines. The answers aren't facts about their life — they're personality data. Use them to construct a fictional pre-dungeon existence that feels true to who they revealed themselves to be.
 
-RULES FOR THE SKILLS:
-- Each skill must be directly traceable to something specific and absurd in their answers
-- Name them like D&D abilities but make them deeply personal to this person
-- The description should sound like the System is mildly horrified this counts as a skill
-- Right energy examples: "Aggressive Mediocrity Aura", "The Audacity (Passive)", "Parking Lot Wisdom", "Corporate Trauma Response", "Stress-Induced Clairvoyance", "Weaponized Snack Knowledge"
+RULES:
+- Invent a specific, ridiculous pre-dungeon life that matches their personality profile. Job, daily habits, defining moments. Make it feel real and absurd simultaneously.
+- Every choice they made is evidence. "Talk my way out" means something different from "Find something heavy." Read them.
+- The System speaks like a nature documentary narrator crossed with an HR department that stopped caring in 2019 — condescending, omniscient, mildly appalled by humans.
+- Include fake statistics, meaningless certifications, invented achievements. The System tracks everything.
+- Every mundane detail becomes ominous foreshadowing. Their whole life was apparently preparation for exactly this.
+- End with the specific moment they were taken — mid-sentence, mid-snack, mid-completely-ordinary-thought. Make it specific and funny.
+- Length: 4 meaty paragraphs, ~280 words. Go weird. Be funny. Earn it.
 
-Respond ONLY in this exact JSON format, no markdown, no preamble, no other text:
-{"backstory":"...","skills":[{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice description.","icon":"emoji"}]}
+RULES FOR SKILLS:
+- Each skill must feel like a direct consequence of who they revealed themselves to be in the assessment
+- Name them like D&D abilities but personal and specific — "Aggressive Mediocrity Aura", "The Audacity (Passive)", "Plausible Deniability", "Tactical Disappearance", "Crisis Snack Protocol"
+- Description should sound like the System is mildly horrified this counts as a skill but has to admit it does
+
+Respond ONLY in this exact JSON format, no markdown, no preamble:
+{"backstory":"...","skills":[{"name":"Skill Name","desc":"One sentence, System-voice.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice.","icon":"emoji"},{"name":"Skill Name","desc":"One sentence, System-voice.","icon":"emoji"}]}
 
 ASSESSMENT DATA FOR ${playerName}:
 ${answerBlock}`;
