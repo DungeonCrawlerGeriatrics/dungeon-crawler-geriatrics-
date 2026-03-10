@@ -871,8 +871,9 @@
       if (document.getElementById('pm-channel-notes').style.display !== 'none') initNotes();
       syncGroupLog(roomData.log||{});
 
-      // Load storyLedger
+      // Load storyLedger and dmNotes
       if (roomData.storyLedger) storyLedger = roomData.storyLedger;
+      if (roomData.dmNotes) dmNotes = roomData.dmNotes;
 
       // Check for a pending roll addressed to ME — activates roll blocker on non-acting players
       const myPendingRoll = roomData.pendingRolls?.[me.id];
@@ -1187,10 +1188,11 @@ OPENING SCENE RULES:
       // Log player action publicly
       await writeGroupLog({type:"player",pid:me.id,pname:myPlayer?.name||me.name,emoji:myPlayer?.heroEmoji||"?",text});
 
-      // Load latest AI history — trim to last 8 exchanges (16 msgs) to prevent bloat
+      // Load latest AI history — trim to last 14 exchanges (28 msgs)
+      // Notebook handles long-term memory; recent window handles short-term continuity
       const snap = await get(ref(db,`rooms/${roomCode}/aiHistory`));
       if(snap.exists()){try{aiHistory=JSON.parse(snap.val());}catch(e){}}
-      if (aiHistory.length > 16) aiHistory = aiHistory.slice(-16);
+      if (aiHistory.length > 28) aiHistory = aiHistory.slice(-28);
 
       const actor     = players[turnIndex];
       const actorInv  = Object.values(actor?.inventory||{}).map(i=>`"${i.name}"`).join(", ") || "nothing";
@@ -1218,13 +1220,16 @@ OPENING SCENE RULES:
       const msg = `#STATE
 ${encodedState}
 
-#LEDGER
-${ledger || '∅ (game just started)'}${privBlock}
+#LEDGER (story facts)
+${ledger || '∅ (game just started)'}
+
+#DM_NOTEBOOK (your writer's notes — NPC voices, running jokes, planted seeds, what felt true)
+${dmNotes || '∅ (nothing written yet — start taking notes when something matters)'}${privBlock}
 
 #ACTION
 ${actor?.name} (${actor?.heroClass||"UNASSIGNED"}) acts: "${text}"
 
-Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name — desc} for items. {TRANSFER: name — from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] only when assigning.`;
+Narrate result. End with [LEDGER_UPDATE: updated_facts]. Update [DM_NOTES: your notebook] whenever something matters — a new NPC voice you want to keep, a joke that landed, a seed you planted, a character moment. This is your long-term memory. Write in your own voice. {LOOT: name — desc} for items. {TRANSFER: name — from:X to:Y} to move items. [SYSTEM: CLASS ASSIGNMENT — Name is now ClassName!] only when assigning.`;
 
       const dmText = await callClaude(buildSysPrompt(), msg, aiHistory);
       aiHistory.push({role:"user",content:msg},{role:"assistant",content:dmText});
@@ -1235,10 +1240,14 @@ Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name — desc} 
       await postSystemNotifs(dmText);
       parseLootFromDM(dmText);
       await parseTransfers(dmText);
-      parseLedgerUpdate(dmText); // extract and save AI's story memory
+      parseLedgerUpdate(dmText);
+      parseDMNotes(dmText);
 
-      // Strip [LEDGER_UPDATE:...] from displayed text
-      const displayText = dmText.replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '').trim();
+      // Strip memory tags from displayed text
+      const displayText = dmText
+        .replace(/\[LEDGER_UPDATE:[^\]]+\]/gi, '')
+        .replace(/\[DM_NOTES:[\s\S]*?\]/gi, '')
+        .trim();
       await writeGroupLog({type:"dm", text:displayText});
 
       // Check if DM called for a roll before advancing turn
@@ -1398,6 +1407,9 @@ ${encodedState}
 #LEDGER (shared story so far)
 ${ledger || "∅"}
 
+#DM_NOTEBOOK
+${dmNotes || "∅"}
+
 ${isRollResult ? `#ROLL_RESULT
 The player just submitted a roll result: ${rollValue}
 This is a RESOLUTION message. Apply the roll outcome now.
@@ -1423,6 +1435,8 @@ After your response write [PRIV_CTX: topic~detail] under 80 chars.`;
         // Parse loot and transfers from private DM response
         parseLootFromDM(dmText);
         await parseTransfers(dmText);
+        parseLedgerUpdate(dmText);
+        parseDMNotes(dmText);
 
         // Extract and save private context summary for group DM awareness
         // DM writes [PRIV_CTX: compressed summary] which bleeds into group context
@@ -1644,11 +1658,14 @@ After your response write [PRIV_CTX: topic~detail] under 80 chars.`;
 
     // Story ledger — compressed narrative maintained by AI across turns
     // Stored in Firebase as roomData.storyLedger
-    // AI is instructed to update it each turn via [LEDGER_UPDATE: ...] tag
     let storyLedger = "";
 
+    // DM Notes — the writer's notebook. Free-form memory: NPC voices, running jokes,
+    // planted seeds, character moments, things that felt true. Updated when DM chooses.
+    // Stored in Firebase as roomData.dmNotes
+    let dmNotes = "";
+
     function buildLedgerFromHistory() {
-      // Fallback: build basic ledger from log entries if no AI-maintained one exists
       if (storyLedger) return storyLedger;
       const log = Object.values(roomData?.log||{})
         .sort((a,b)=>(a.ts||0)-(b.ts||0))
@@ -1666,8 +1683,17 @@ After your response write [PRIV_CTX: topic~detail] under 80 chars.`;
       const m = dmText.match(/\[LEDGER_UPDATE:\s*([^\]]+)\]/i);
       if (m) {
         storyLedger = m[1].trim();
-        // Save to Firebase
         update(ref(db, `rooms/${roomCode}`), { storyLedger });
+      }
+    }
+
+    function parseDMNotes(dmText) {
+      // DM can update its notebook with [DM_NOTES: ...free text... ]
+      // Multi-line content between tags
+      const m = dmText.match(/\[DM_NOTES:\s*([\s\S]*?)\]/i);
+      if (m) {
+        dmNotes = m[1].trim().slice(0, 2000); // cap at 2000 chars
+        update(ref(db, `rooms/${roomCode}`), { dmNotes });
       }
     }
 
@@ -1735,11 +1761,29 @@ Let characters surprise you. If someone does something unexpected and wonderful,
   ST:condition+condition
 == END SCHEMA ==
 
-== LEDGER (your memory) ==
+== LEDGER (your compressed facts) ==
 Write [LEDGER_UPDATE: KEY:value|KEY:value] every turn.
 Keys: LOC, CLZ, PLOT, ITEM, NPC, DANGER, SECRET, MOOD
-Keep under 400 chars. This is how you remember what matters.
+Keep under 400 chars. Facts only. Where things are. What's been established.
 == END LEDGER ==
+
+== DM NOTEBOOK (your writer's memory) ==
+This is your most important tool. Use [DM_NOTES: ...] to write to it whenever something matters.
+It persists across the entire session. You read it at the start of every turn.
+
+Write in it like a novelist's margin notes:
+- NPC voices: "SP7 speaks in customer service euphemisms but occasionally something real slips through. It refers to the fryer as 'my colleague'."
+- Running jokes: "The fryer dings at dramatically appropriate moments. It has timed three now. Bob has noticed."  
+- Planted seeds: "The scratched-out faces photo — three people, all gone. The most recent date was 3 days ago. Nobody's asked about it yet."
+- Character moments: "Jake ate the burger without hesitating. Note this. It says something."
+- Things that felt true: "This group treats absurdity with exhausted normalcy. They've stopped asking why. Lean into that."
+- Threads to pull later: "The office logbook entry ends mid-sentence. Day 47. Something interrupted the writer."
+- What the dungeon wants: "Depth 1 is almost comfortable. That's the trap."
+
+Update it when: an NPC becomes real, a joke lands and should recur, you plant something you want to pay off, a player does something that reveals their character. You don't have to update it every turn — only when something matters enough to remember.
+
+Max 2000 chars. Write in your own voice. This is your notebook, not a report.
+== END NOTEBOOK ==
 
 == CLASSES ==
 Assign after 4-6 actions of clear tendency. Only via [SYSTEM: CLASS ASSIGNMENT — Name is now a ClassName!]
@@ -1791,6 +1835,7 @@ NT: notes are DM-only — never reveal to other players.
 
 PURPOSE: Secret info, private items, behind-the-scenes coordination ONLY.
 NOT FOR: Full scenes, other players' dialogue, outcomes that happen in shared space.
+Your #DM_NOTEBOOK and #LEDGER are injected into every message — use them for consistency.
 
 ━━━ THE PUBLIC BLEED RULE (CRITICAL) ━━━
 Any action that happens IN THE SHARED SPACE must produce a [public:] tag.
