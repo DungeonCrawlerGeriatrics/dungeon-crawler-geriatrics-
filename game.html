@@ -1386,6 +1386,10 @@ Narrate result. End with [LEDGER_UPDATE: updated_ledger]. {LOOT: name — desc} 
       privateLog.appendChild(typingEl);
       privateLog.scrollTop=privateLog.scrollHeight;
 
+      const rollResultMatch = text.match(/rolled?\s+(?:a\s+)?(\d+)|result[:\s]+(\d+)|→\s*(\d+)|d\d+[^→]*→\s*(\d+)/i);
+      const isRollResult = !!rollResultMatch;
+      const rollValue = rollResultMatch ? parseInt(rollResultMatch[1]||rollResultMatch[2]||rollResultMatch[3]||rollResultMatch[4]) : null;
+
       const encodedState = encodeGameState();
       const ledger = storyLedger || buildLedgerFromHistory();
       const pmMsg = `#STATE
@@ -1394,12 +1398,20 @@ ${encodedState}
 #LEDGER (shared story so far)
 ${ledger || "∅"}
 
-#PRIVATE_MESSAGE from ${myPlayer?.name||me.name}:
+${isRollResult ? `#ROLL_RESULT
+The player just submitted a roll result: ${rollValue}
+This is a RESOLUTION message. Apply the roll outcome now.
+- Write private narration for what ONLY ${myPlayer?.name||me.name} experiences/knows
+- Write [public:] for EVERYTHING that happened in shared space — full DM narration, as if writing the group channel
+- Update [LEDGER_UPDATE:] with what changed
+- Do NOT ask for another roll unless a new action triggers one
+
+` : ''}#PRIVATE_MESSAGE from ${myPlayer?.name||me.name}:
 "${text}"
 
-Respond privately. Only this player sees this.
-After your response, write [PRIV_CTX: one-line compressed summary of what was just discussed/decided/revealed] so the group DM context stays aware of private threads. Keep it under 80 chars. Format: topic~detail+topic~detail
-Example: [PRIV_CTX: brass_key~warm_in_dungeon+Duggs_suspicious_of_Shabadoo]`;
+${isRollResult ? '' : `If this action will happen in shared space, call for a roll with [ROLL: d20+STAT — reason] and describe success/fail stakes. Do NOT narrate the outcome yet — wait for the roll result.`}
+
+After your response write [PRIV_CTX: topic~detail] under 80 chars.`;
 
       try {
         const dmText = await callClaude(buildPrivateSysPrompt(), pmMsg, privateHistory);
@@ -1423,10 +1435,13 @@ Example: [PRIV_CTX: brass_key~warm_in_dungeon+Duggs_suspicious_of_Shabadoo]`;
           await update(ref(db, `rooms/${roomCode}/players/${me.id}`), { privateContext: trimmed });
         }
 
-        // Bleed [public: ...] to group log
-        const pubMatches = [...dmText.matchAll(/\[public:\s*([^\]]+)\]/gi)];
+        // Bleed [public: ...] to group log as proper DM narration entries
+        const pubMatches = [...dmText.matchAll(/\[public:\s*([\s\S]*?)(?=\[public:|$)/gi)];
         for (const match of pubMatches) {
-          await writeGroupLog({ type:"public-bleed", playerName:myPlayer?.name||me.name, text:match[1].trim() });
+          const pubText = match[1].replace(/\[PRIV_CTX:[^\]]+\]/gi,'').replace(/\[LEDGER_UPDATE:[^\]]+\]/gi,'').trim();
+          if (pubText) {
+            await writeGroupLog({ type:"dm", text: pubText });
+          }
         }
 
         // Strip mechanical tags — write clean text to private log
@@ -1755,26 +1770,56 @@ Don't roll for: looking, talking, safe movement.`;
       const ledger = storyLedger || buildLedgerFromHistory();
       return `You are the DM for Dungeon Crawler Geriatrics. A player is whispering to you PRIVATELY.
 
-== ENCODED STATE SCHEMA — same as group DM ==
+== ENCODED STATE SCHEMA ==
 @Name|CLS|HPc/m|MPc/m|stats  /  INV:items  /  SK:skills  /  NT:private_notes  /  BS:backstory
 == END SCHEMA ==
 
 #GROUP_STORY_LEDGER (what has happened publicly so far):
 ${ledger || "∅ (game just started)"}
 
-INVENTORY IS AUTHORITATIVE: Only items in the #STATE INV: lists exist. Never invent items.
+INVENTORY IS AUTHORITATIVE: Only items in INV: exist. Never invent items.
 NT: notes are DM-only — never reveal to other players.
 
-PRIVATE CHANNEL RULES:
-- For short whispers, secret info, private items, behind-the-scenes moves
-- NOT for scenes between players, other players' dialogue, or group confrontations
-- If action is visible to the group: [public: what others see — third person, no player dialogue]
-- New items: {LOOT: name — desc}. Move items: {TRANSFER: EXACT name — from:X to:Y}
+━━━ PRIVATE CHANNEL RULES ━━━
 
-After your response, write [PRIV_CTX: compressed_summary] (under 80 chars) so this thread stays in the group DM's awareness.
-Format: topic~detail+topic~detail  Example: [PRIV_CTX: brass_key~warm_reacts_to_dungeon+plans_to_hide_from_Shabadoo]
+PURPOSE: Secret info, private items, behind-the-scenes coordination ONLY.
+NOT FOR: Full scenes, other players' dialogue, outcomes that happen in shared space.
 
-Keep response under 80 words. Short. Conspiratorial.`;
+━━━ THE PUBLIC BLEED RULE (CRITICAL) ━━━
+Any action that happens IN THE SHARED SPACE must produce a [public:] tag.
+This is not optional. If the action affects, involves, or is observable by other players, you MUST write it.
+
+EXAMPLES OF WHAT MUST GO PUBLIC:
+- Touching another player → [public: Duggs reaches toward Bob's back pocket]
+- Items making noise/heat/smell → [public: The spatula clatters to the stone floor, still radiating heat. Everyone's eyes go to it.]
+- Failed stealth → [public: Bob pivots sharply. His eyes find Duggs immediately.]
+- Any physical outcome in shared space → [public: full narration of what all players witness]
+
+The [public:] text should be written as DUNGEON MASTER narration — full, evocative, same quality as the group channel. NOT a summary. A real scene.
+Multiple [public:] tags are allowed if multiple beats happen.
+
+━━━ ROLL RESOLUTION RULE (CRITICAL) ━━━
+When this message contains a ROLL RESULT (e.g. "rolled a 5", "result: 12", "d20 → 8"):
+1. Resolve the private outcome privately (what only THEY experience/know)
+2. Write [public:] for everything that happened in shared space as a result — full narration
+3. Include [LEDGER_UPDATE: ...] to update the shared story state
+
+When calling for a roll:
+- Use [ROLL: d20+STAT — reason] tag so the dice tray opens
+- Be specific about DC and consequences of success/failure
+- Do NOT narrate the outcome until you receive the roll result
+
+━━━ TAG REFERENCE ━━━
+[public: full narration for group log — third person, no player dialogue]
+[ROLL: d20+DEX — reason for rolling]  
+{LOOT: item name — desc}
+{TRANSFER: item name — from:X to:Y}
+[PRIV_CTX: topic~detail+topic~detail]
+[LEDGER_UPDATE: KEY:value|KEY:value]
+
+After EVERY response, write [PRIV_CTX: compressed_summary under 80 chars].
+
+Keep private narration SHORT (under 60 words). The [public:] tags can be longer — they're DM quality narration.`;
     }
 
     function setTyping(on){document.getElementById("dm-typing").classList.toggle("visible",on);}
@@ -2245,7 +2290,7 @@ Keep response under 80 words. Short. Conspiratorial.`;
         await writeGroupLog({ type: 'roll', text: rollStr, playerName });
         if (pendingRoll) { clearPendingRoll(); await advanceTurn(); }
       } else {
-        // Secret — write to private log only, DM sees via system
+        // Secret — write to private log
         const key = push(ref(db, `rooms/${roomCode}/players/${me.id}/privateLog`)).key;
         await set(ref(db, `rooms/${roomCode}/players/${me.id}/privateLog/${key}`), {
           from: 'me', text: `🎲 SECRET ROLL: ${rollStr}`, ts: Date.now()
@@ -2259,6 +2304,24 @@ Keep response under 80 words. Short. Conspiratorial.`;
           resultArea.querySelector('.private-empty')?.remove();
           resultArea.appendChild(div);
           resultArea.scrollTop = resultArea.scrollHeight;
+        }
+        // AUTO-RESOLVE: Feed roll result back to private DM so it can narrate the outcome
+        // and fire [public:] for anything that happened in shared space
+        const privateInput = document.getElementById('private-input');
+        if (privateInput && pendingRoll) {
+          // Was a DM-requested roll — auto-submit result for resolution
+          privateInput.value = `Roll result: ${rollStr}`;
+          clearPendingRoll();
+          setTimeout(() => window.sendPrivateAction(), 200);
+        } else if (privateInput) {
+          // Voluntary secret roll — pre-fill so player can add context if they want,
+          // but auto-submit after short delay so DM resolves it
+          privateInput.value = `Roll result: ${rollStr}`;
+          setTimeout(() => {
+            if (privateInput.value.startsWith('Roll result:')) {
+              window.sendPrivateAction();
+            }
+          }, 1500); // short delay — player can edit if they want to add context
         }
       }
     };
