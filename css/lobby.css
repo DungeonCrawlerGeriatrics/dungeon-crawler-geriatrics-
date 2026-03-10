@@ -9,7 +9,8 @@
   justify-content: center;
   padding: 2rem 1rem;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Animated grid background */
@@ -177,4 +178,14 @@
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .lobby-card { padding: 1.5rem 1.25rem; }
+}
+
+@media (max-width: 768px) {
+  .lobby-page {
+    align-items: flex-start;
+    padding: 1.5rem 0.75rem 3rem;
+  }
+  .lobby-wrap { width: 100%; }
+  .sys-title { font-size: 1.8rem; }
+  .lobby-card { padding: 1rem; }
 }
